@@ -3,7 +3,6 @@ import path from 'path';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import dns from 'dns';
-import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './api/routes';
 import { User } from './api/models';
 import bcrypt from 'bcryptjs';
@@ -88,14 +87,8 @@ async function startServer() {
     res.status(500).json({ message: err.message || 'Internal Server Error' });
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
+  // Serve frontend static files in production
+  if (process.env.NODE_ENV === "production") {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
@@ -106,11 +99,6 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
-
-  // Start background initialization of AI models
-  import('./api/aiService.js').then(({ initializeAI }) => {
-    initializeAI();
-  }).catch(err => console.error('Failed to import aiService:', err));
 }
 
 startServer();

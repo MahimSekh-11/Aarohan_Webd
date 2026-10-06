@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { useLanguageStore } from '../store/useLanguageStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
-import { useNotificationStore } from './NotificationProvider';
 
 export default function VoiceAgent() {
   const [isRecording, setIsRecording] = useState(false);
@@ -14,7 +13,6 @@ export default function VoiceAgent() {
   const { currentLang, translate } = useLanguageStore();
   const { user, token } = useAuthStore();
   const navigate = useNavigate();
-  const addNotification = useNotificationStore(state => state.addNotification);
 
   const toggleRecording = async () => {
     if (isRecording) {
@@ -43,11 +41,7 @@ export default function VoiceAgent() {
         setIsRecording(true);
       } catch (err) {
         console.error('Error accessing microphone:', err);
-        addNotification({
-          id: Date.now().toString(),
-          message: 'Could not access microphone',
-          type: 'error'
-        });
+        alert('Could not access microphone');
       }
     }
   };
@@ -74,12 +68,6 @@ export default function VoiceAgent() {
           window.speechSynthesis.speak(msg);
         }
 
-        addNotification({
-          id: Date.now().toString(),
-          message: `${translate('You said:')} "${data.transcript}".\n${translate('Action:')} ${message}`,
-          type: 'success'
-        });
-
         if (action === 'create_product' && user?.role === 'manager') {
           // Auto create product via API
           const createRes = await fetch('/api/products', {
@@ -99,11 +87,7 @@ export default function VoiceAgent() {
       }
     } catch (err) {
       console.error('Error processing audio:', err);
-      addNotification({
-        id: Date.now().toString(),
-        message: 'Failed to process audio command',
-        type: 'error'
-      });
+      alert('Failed to process audio command');
     } finally {
       setIsProcessing(false);
     }

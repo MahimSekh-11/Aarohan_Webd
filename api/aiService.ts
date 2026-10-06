@@ -1,5 +1,6 @@
 import { pipeline, env } from '@xenova/transformers';
-import { WaveFile } from 'wavefile';
+import wavefile from 'wavefile';
+const { WaveFile } = wavefile;
 
 // Disable local models loading from an absolute path (forces download from HuggingFace to cache)
 env.allowLocalModels = false;

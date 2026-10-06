@@ -3,9 +3,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User, Product, Lead } from './models';
 import { authMiddleware, requireRole } from './middleware';
-import multer from 'multer';
-import { transcribeAudio, translateText, parseIntent } from './aiService';
 
+import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage() });
 
 export const apiRouter = Router();
@@ -352,6 +351,7 @@ apiRouter.post('/ai/transcribe-and-intent', upload.single('audio'), async (req: 
     }
 
     // 1. Transcribe audio to text locally
+    const { transcribeAudio, parseIntent } = await import('./aiService');
     let transcript = await transcribeAudio(req.file.buffer);
     
     // 2. Parse intent from text
@@ -372,6 +372,7 @@ apiRouter.post('/ai/translate', async (req: Request, res: Response): Promise<voi
       return;
     }
     
+    const { translateText } = await import('./aiService');
     // If multiple strings in array
     if (Array.isArray(text)) {
       const translated = await Promise.all(text.map(t => translateText(t, sourceLang, targetLang)));
