@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Search, Filter, MapPin, Phone, Truck, Package, Store, Star, MessageSquare, X, ChevronLeft, ChevronRight, AlertCircle, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useT } from '../components/Translate';
 
 const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (id: string) => Promise<boolean> }) => {
   const [loading, setLoading] = useState(false);
@@ -14,6 +15,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
   const [cardImageIdx, setCardImageIdx] = useState(0);
   const [modalImageIdx, setModalImageIdx] = useState(0);
   const { user, token } = useAuthStore();
+  const t = useT();
 
   const handleInterest = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -135,7 +137,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
           {/* Stock Indicator */}
           {outOfStock ? (
             <div className="mb-2.5 inline-flex items-center gap-1.5 bg-red-950/40 text-red-400 font-bold text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-full border border-red-900/30 w-max font-mono">
-              <AlertCircle className="w-3 h-3" /> Out of stock
+              <AlertCircle className="w-3 h-3" /> {t('Out of Stock')}
             </div>
           ) : isLowStock ? (
             <div className="mb-2.5 inline-flex items-center gap-1.5 bg-amber-950/40 text-amber-400 font-bold text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-full border border-amber-900/30 w-max font-mono">
@@ -162,7 +164,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
               onClick={(e) => { e.stopPropagation(); setShowModal(true); setModalImageIdx(0); }}
               className="bg-[#0B0F19] border border-[#334155] text-[#F9FAFB] group-hover:bg-[#10B981] group-hover:text-[#0B0F19] group-hover:border-[#10B981] rounded-xl px-4 py-2.5 text-[11px] font-black uppercase tracking-wider transition-all duration-300 cursor-pointer shadow-md hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] shrink-0"
             >
-              Details
+              {t('View Details')}
             </button>
           </div>
         </div>
@@ -279,10 +281,10 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
                       'text-white'
                     }`}
                   >
-                    {loading ? 'Processing...' : 
-                     success ? <><CheckCircle className="w-5 h-5 text-[#0B0F19]" /> Interest Shared with Store Manager!</> : 
-                     outOfStock ? 'Currently Unavailable' :
-                     'I Want to Buy This'}
+                    {loading ? t('Loading...') : 
+                     success ? <><CheckCircle className="w-5 h-5 text-[#0B0F19]" /> {t('Interest Logged!')}</> : 
+                     outOfStock ? t('Out of Stock') :
+                     t('I Want to Buy This')}
                   </button>
                 </div>
                 
@@ -374,6 +376,7 @@ export default function Marketplace() {
   const [selectedStore, setSelectedStore] = useState('');
   const { user, token } = useAuthStore();
   const navigate = useNavigate();
+  const t = useT();
 
   const fetchProducts = async () => {
     try {
@@ -416,15 +419,15 @@ export default function Marketplace() {
     <div className="space-y-6">
       <div className="bg-[#1E293B] p-4 sm:p-6 rounded-2xl sm:rounded-[32px] shadow-lg border border-[#334155]">
         <h1 className="text-2xl sm:text-3xl font-black text-[#F9FAFB] mb-6 flex items-center gap-3">
-          <span className="w-3 h-3 bg-[#10B981] rounded-full shadow-[0_0_8px_#10B981] animate-pulse"></span> Marketplace
+          <span className="w-3 h-3 bg-[#10B981] rounded-full shadow-[0_0_8px_#10B981] animate-pulse"></span> {t('Marketplace')}
         </h1>
-        
+
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9CA3AF] w-5 h-5 font-black" />
             <input
               type="text"
-              placeholder="Search products..."
+              placeholder={t('Search products...')}
               className="w-full pl-12 pr-4 py-3 bg-[#0B0F19] text-[#F9FAFB] font-semibold placeholder-[#475569] border border-[#334155] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -435,7 +438,7 @@ export default function Marketplace() {
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
-            <option value="">All Categories</option>
+            <option value="">{t('All Categories')}</option>
             <option value="Groceries">Groceries</option>
             <option value="Handicrafts">Handicrafts</option>
             <option value="Electronics">Electronics</option>
@@ -447,7 +450,7 @@ export default function Marketplace() {
             value={selectedStore}
             onChange={(e) => setSelectedStore(e.target.value)}
           >
-            <option value="">All Stores</option>
+            <option value="">{t('All Locations')}</option>
             {uniqueStores.map(storeName => (
               <option key={storeName} value={storeName}>{storeName}</option>
             ))}
@@ -476,7 +479,7 @@ export default function Marketplace() {
         ))}
         {filteredProducts.length === 0 && (
           <div className="col-span-full py-12 text-center text-[#9CA3AF] bg-[#1E293B] rounded-[32px] border border-[#334155] font-bold font-mono">
-            No products found matching your search.
+            {t('No products found.')}
           </div>
         )}
       </div>

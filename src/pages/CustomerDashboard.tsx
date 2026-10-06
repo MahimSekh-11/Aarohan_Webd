@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Phone, MapPin, Package, Store, ShoppingBag, ClipboardList } from 'lucide-react';
 import Marketplace from './Marketplace';
+import { useT } from '../components/Translate';
 
 export default function CustomerDashboard() {
   const [leads, setLeads] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'browse' | 'requests'>('browse');
   const { token } = useAuthStore();
+  const t = useT();
 
   useEffect(() => {
     const fetchLeads = async () => {
@@ -32,13 +34,13 @@ export default function CustomerDashboard() {
           onClick={() => setActiveTab('browse')}
           className={`cursor-pointer flex-1 flex items-center justify-center gap-2 py-3 px-2 rounded-xl sm:rounded-2xl font-bold uppercase tracking-wider text-[10px] sm:text-xs transition ${activeTab === 'browse' ? 'bg-[#2d5a27] text-white shadow-md' : 'bg-[#f9f9f7] text-gray-500 hover:bg-[#e7f0e6] hover:text-[#2d5a27]'}`}
         >
-          <ShoppingBag className="w-4 h-4" /> Browse Marketplace
+          <ShoppingBag className="w-4 h-4" /> {t('Marketplace')}
         </button>
         <button 
           onClick={() => setActiveTab('requests')}
           className={`cursor-pointer flex-1 flex items-center justify-center gap-2 py-3 px-2 rounded-xl sm:rounded-2xl font-bold uppercase tracking-wider text-[10px] sm:text-xs transition ${activeTab === 'requests' ? 'bg-[#2d5a27] text-white shadow-md' : 'bg-[#f9f9f7] text-gray-500 hover:bg-[#e7f0e6] hover:text-[#2d5a27]'}`}
         >
-          <ClipboardList className="w-4 h-4" /> My Buying Requests
+          <ClipboardList className="w-4 h-4" /> {t('My Requests')}
         </button>
       </div>
 
@@ -68,7 +70,7 @@ export default function CustomerDashboard() {
                 lead.status === 'contacted' ? 'bg-yellow-100 text-yellow-800' :
                 'bg-[#2d5a27] text-white'
               }`}>
-                {lead.status}
+                {t(lead.status) || lead.status}
               </span>
               
               <div className="space-y-2 text-xs font-bold text-gray-600 bg-[#f9f9f7] p-4 border border-[#eeede8] rounded-2xl flex-1">
@@ -81,7 +83,7 @@ export default function CustomerDashboard() {
           ))}
           {leads.length === 0 && (
             <div className="col-span-full py-12 text-center font-bold text-gray-500 bg-white rounded-[32px] border border-[#e2e0d9]">
-              You haven't requested any products yet.
+              {t('No requests yet')}
             </div>
           )}
         </div>

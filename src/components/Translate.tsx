@@ -6,10 +6,14 @@ interface TranslateProps {
 }
 
 export function Translate({ children }: TranslateProps) {
-  const translate = useLanguageStore(state => state.translate);
+  const translate = useLanguageStore(state => state.t);
   return <>{translate(children)}</>;
 }
 
-export function useTranslate() {
-  return useLanguageStore(state => state.translate);
+// Hook: const t = useT();  then  t('Hello')
+export function useT() {
+  return useLanguageStore(state => state.t);
 }
+
+// Keep old name for compatibility
+export const useTranslate = useT;

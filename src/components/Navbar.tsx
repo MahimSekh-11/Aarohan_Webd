@@ -1,16 +1,16 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { Store, UserCircle, LogOut, LayoutDashboard } from 'lucide-react';
+import { Store, UserCircle, LogOut, LayoutDashboard, Globe } from 'lucide-react';
 import { NotificationBell } from './NotificationProvider';
-import { useLanguageStore } from '../store/useLanguageStore';
+import { useLanguageStore, LANGUAGE_NAMES, Language } from '../store/useLanguageStore';
+import { useT } from './Translate';
 
 export default function Navbar() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-
   const { currentLang, setLanguage } = useLanguageStore();
-  const t = useLanguageStore(state => state.translate);
+  const t = useT();
 
   const handleLogout = () => {
     logout();
@@ -28,18 +28,24 @@ export default function Navbar() {
             TIORKHALI MART
           </h1>
         </Link>
-        
-        <select 
-          value={currentLang}
-          onChange={(e) => setLanguage(e.target.value as any)}
-          className="bg-[#1E293B] border border-[#334155] text-white text-xs sm:text-sm rounded-lg px-2 py-1 outline-none focus:border-[#10B981]"
-        >
-          <option value="en">Eng</option>
-          <option value="hi">हिंदी</option>
-          <option value="bn">বাংলা</option>
-        </select>
+
+        {/* Language Selector */}
+        <div className="flex items-center gap-1 bg-[#1E293B] border border-[#334155] rounded-lg px-2 py-1">
+          <Globe className="w-3 h-3 text-[#10B981] shrink-0" />
+          <select
+            value={currentLang}
+            onChange={(e) => setLanguage(e.target.value as Language)}
+            className="bg-transparent text-white text-xs sm:text-sm outline-none cursor-pointer"
+          >
+            {(Object.keys(LANGUAGE_NAMES) as Language[]).map(lang => (
+              <option key={lang} value={lang} className="bg-[#1E293B]">
+                {LANGUAGE_NAMES[lang]}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-      
+
       <div className="flex items-center gap-2 sm:gap-4 pl-1 sm:pl-2">
         {user ? (
           <>
@@ -47,7 +53,7 @@ export default function Navbar() {
               <p className="text-[10px] font-black text-[#8B5CF6] uppercase tracking-widest">{user.role}</p>
               <p className="text-sm font-bold text-[#F9FAFB]">{user.name}</p>
             </div>
-            
+
             <NotificationBell />
 
             {user.role === 'admin' && (
@@ -84,4 +90,3 @@ export default function Navbar() {
     </header>
   );
 }
-
