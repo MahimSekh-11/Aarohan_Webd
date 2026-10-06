@@ -1,4 +1,6 @@
+import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
+import fs from 'fs';
 import path from 'path';
 import cors from 'cors';
 import mongoose from 'mongoose';
@@ -87,17 +89,29 @@ async function startServer() {
     res.status(500).json({ message: err.message || 'Internal Server Error' });
   });
 
-  // Serve frontend static files in production
-  if (process.env.NODE_ENV === "production") {
-    const distPath = path.join(process.cwd(), 'dist');
+  // Serve frontend static files if built, otherwise show helpful message
+  const distPath = path.join(process.cwd(), 'dist');
+  if (fs.existsSync(path.join(distPath, 'index.html'))) {
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
+    });
+  } else {
+    app.get('*', (req, res) => {
+      res.send(`
+        <h2>Tiorkhali Mart - Backend Running</h2>
+        <p>The backend is active on port ${PORT}.</p>
+        <p><b>For frontend development:</b> Please open <a href="http://localhost:5173">http://localhost:5173</a> in your browser.</p>
+        <p>If you want to test the production build, run <code>npm run build</code> first.</p>
+      `);
     });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    if (!fs.existsSync(path.join(distPath, 'index.html'))) {
+      console.log(`Frontend dev server should be running at http://localhost:5173`);
+    }
   });
 }
 

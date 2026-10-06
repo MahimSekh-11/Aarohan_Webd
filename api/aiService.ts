@@ -8,26 +8,38 @@ env.useBrowserCache = false; // We are in node
 
 let transcriber: any = null;
 let translator: any = null;
+let transcriberLoading: Promise<any> | null = null;
+let translatorLoading: Promise<any> | null = null;
+let translationQueue: Promise<unknown> = Promise.resolve();
+let transcriptionQueue: Promise<unknown> = Promise.resolve();
+
+export const langCodes: Record<string, string> = {
+  en: 'eng_Latn', hi: 'hin_Deva', bn: 'ben_Beng', ta: 'tam_Taml',
+  te: 'tel_Telu', mr: 'mar_Deva', gu: 'guj_Gujr',
+};
+const speechLanguages: Record<string, string> = {
+  en: 'english', hi: 'hindi', bn: 'bengali', ta: 'tamil',
+  te: 'telugu', mr: 'marathi', gu: 'gujarati',
+};
+
+async function loadTranscriber() {
+  if (transcriber) return transcriber;
+  transcriberLoading ??= pipeline('automatic-speech-recognition', process.env.WHISPER_MODEL || 'Xenova/whisper-base')
+    .then(model => transcriber = model).catch(error => { transcriberLoading = null; throw error; });
+  return transcriberLoading;
+}
+
+async function loadTranslator() {
+  if (translator) return translator;
+  translatorLoading ??= pipeline('translation', 'Xenova/nllb-200-distilled-600M')
+    .then(model => translator = model).catch(error => { translatorLoading = null; throw error; });
+  return translatorLoading;
+}
 
 // Initialize the models
 export async function initializeAI() {
-  console.log('Initializing local AI models. This may take a while on first run (downloading weights)...');
-  
-  try {
-    if (!transcriber) {
-      console.log('Loading Whisper model (Speech-to-Text)...');
-      transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
-    }
-    
-    if (!translator) {
-      console.log('Loading NLLB model (Translation)...');
-      translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M');
-    }
-    
-    console.log('AI models loaded successfully.');
-  } catch (err) {
-    console.error('Error loading AI models:', err);
-  }
+  await loadTranscriber();
+  await loadTranslator();
 }
 
 // Convert audio buffer to Float32Array for Whisper
@@ -41,48 +53,51 @@ export function convertAudioBuffer(buffer: Buffer): Float32Array {
   if (Array.isArray(audioData)) {
     audioData = audioData[0];
   }
-  return audioData as Float32Array;
+  return Float32Array.from(audioData);
 }
 
-export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
-  if (!transcriber) await initializeAI();
+export async function transcribeAudio(audioBuffer: Buffer, language = 'en'): Promise<string> {
+  if (!speechLanguages[language]) throw new Error('Unsupported speech language');
   try {
     const audioData = convertAudioBuffer(audioBuffer);
-    const result = await transcriber(audioData, {
+    if (!audioData.length || audioData.every(sample => Math.abs(sample) < 0.001)) throw new Error('No speech detected. Please try again.');
+    if (audioData.length > 16000 * 35) throw new Error('Recording is too long. Please record at most 30 seconds.');
+    await loadTranscriber();
+    const run = transcriptionQueue.then(() => transcriber(audioData, {
       chunk_length_s: 30,
       stride_length_s: 5,
-      language: 'english',
+      language: speechLanguages[language],
       task: 'transcribe',
-    });
-    return result.text;
+    }));
+    transcriptionQueue = run.catch(() => {});
+    const result = await run;
+    if (!result.text?.trim()) throw new Error('No speech detected. Please try again.');
+    return result.text.trim();
   } catch (err) {
     console.error('Transcription error:', err);
     throw err;
   }
 }
 
-const langCodes: Record<string, string> = {
-  'hi': 'hin_Deva', // Hindi
-  'bn': 'ben_Beng', // Bengali
-  'en': 'eng_Latn', // English
-};
-
 export async function translateText(text: string, srcLang: string, tgtLang: string): Promise<string> {
-  if (!translator) await initializeAI();
-  const src = langCodes[srcLang] || 'eng_Latn';
-  const tgt = langCodes[tgtLang] || 'eng_Latn';
+  const src = langCodes[srcLang];
+  const tgt = langCodes[tgtLang];
+  if (!src || !tgt) throw new Error('Unsupported translation language');
   
   if (src === tgt) return text;
+  await loadTranslator();
 
   try {
-    const result = await translator(text, {
+    const run = translationQueue.then(() => translator(text, {
       src_lang: src,
       tgt_lang: tgt,
-    });
+    }));
+    translationQueue = run.catch(() => {});
+    const result = await run;
     return result[0].translation_text;
   } catch (err) {
     console.error('Translation error:', err);
-    return text; // fallback
+    throw err;
   }
 }
 
@@ -91,7 +106,7 @@ export async function parseIntent(text: string): Promise<any> {
   // For product creation, format typically expected: "Add 5kg of rice for 200 rupees"
   const lowerText = text.toLowerCase();
   
-  if (lowerText.includes('add') || lowerText.includes('create') || lowerText.includes('new product')) {
+  if (/\b(add|create|new product)\b/.test(lowerText)) {
     // Basic regex extraction
     const qtyMatch = lowerText.match(/(\d+(?:\.\d+)?)\s*(kg|g|liters?|pcs|packets?)/);
     const priceMatch = lowerText.match(/(?:for|rs|rupees)\s*(\d+(?:\.\d+)?)/) || lowerText.match(/(\d+(?:\.\d+)?)\s*(?:rupees|rs)/);
@@ -102,7 +117,7 @@ export async function parseIntent(text: string): Promise<any> {
     if (priceMatch) name = name.replace(priceMatch[0], '');
     
     // clean up
-    name = name.replace(/of|with/gi, '').replace(/\s+/g, ' ').trim();
+    name = name.replace(/\b(of|with)\b/gi, '').replace(/\s+/g, ' ').trim();
     name = name.charAt(0).toUpperCase() + name.slice(1);
 
     const quantity = qtyMatch ? parseFloat(qtyMatch[1]) : 1;
@@ -127,7 +142,7 @@ export async function parseIntent(text: string): Promise<any> {
       message: `I understood you want to add a product: ${name}, Price: ₹${price}.`
     };
   } else if (lowerText.includes('find') || lowerText.includes('search') || lowerText.includes('looking for')) {
-    let query = text.replace(/find|search|looking for|me|some/gi, '').trim();
+    let query = text.replace(/\b(find|search|looking for|me|some)\b/gi, '').trim();
     return {
       action: 'search_product',
       data: { search: query },

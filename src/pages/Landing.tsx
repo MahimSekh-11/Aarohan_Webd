@@ -26,12 +26,9 @@ export default function Landing() {
           <span className="bg-[#10B981]/10 backdrop-blur-md border border-[#10B981]/35 text-[#10B981] text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full flex items-center gap-1.5 font-mono shadow-[0_0_15px_rgba(16,185,129,0.15)]">
             <Sparkles className="w-3.5 h-3.5 animate-pulse" /> {t('Empowering Local Micro-Commerce')}
           </span>
-          <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-none text-[#F9FAFB] uppercase drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-            TIORKHALI <span className="text-[#10B981] drop-shadow-[0_0_12px_rgba(16,185,129,0.25)]">MART</span>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-none text-[#F9FAFB] uppercase drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">{t("TIORKHALI")}<span className="text-[#10B981] drop-shadow-[0_0_12px_rgba(16,185,129,0.25)]">{t('MART')}</span>
           </h1>
-          <p className="text-base md:text-lg font-medium leading-relaxed text-[#9CA3AF]">
-            Our Motto: <span className="font-bold text-[#F9FAFB] border-b-2 border-[#10B981]/30 pb-1">"Connecting Hearts, Elevating Local Crafts."</span> We bridge the gap between skilled rural artisans, local vendors, and passionate buyers. Experience authentic craftsmanship, fresh regional produce, and personalized commerce.
-          </p>
+          <p className="text-base md:text-lg font-medium leading-relaxed text-[#9CA3AF]">{t("Our Motto:")}<span className="font-bold text-[#F9FAFB] border-b-2 border-[#10B981]/30 pb-1">{t("\"Connecting Hearts, Elevating Local Crafts.\"")}</span>{t("We bridge the gap between skilled rural artisans, local vendors, and passionate buyers. Experience authentic craftsmanship, fresh regional produce, and personalized commerce.")}</p>
           <div className="flex flex-col sm:flex-row gap-4 mt-6 w-full sm:w-auto">
             {token && user ? (
               <Link
@@ -71,25 +68,19 @@ export default function Landing() {
           <div className="bg-[#1E293B] rounded-3xl border border-[#334155] p-8 shadow-lg hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:border-[#10B981]/50 transition-all duration-300 flex flex-col gap-4 group transform-gpu">
             <div className="w-12 h-12 bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/25 rounded-2xl flex items-center justify-center font-mono font-black text-lg shadow-[0_0_10px_rgba(16,185,129,0.2)]">1</div>
             <h3 className="text-xl font-extrabold text-[#F9FAFB] group-hover:text-[#10B981] transition-colors">{t('Browse & Selection')}</h3>
-            <p className="text-sm font-medium text-[#9CA3AF] leading-relaxed">
-              Explore authentic local merchandise listed directly by regional Store Managers, ranging from handicrafts, traditional garments, to daily groceries.
-            </p>
+            <p className="text-sm font-medium text-[#9CA3AF] leading-relaxed">{t("Explore authentic local merchandise listed directly by regional Store Managers, ranging from handicrafts, traditional garments, to daily groceries.")}</p>
           </div>
 
           <div className="bg-[#1E293B] rounded-3xl border border-[#334155] p-8 shadow-lg hover:shadow-[0_0_15px_rgba(139,92,246,0.15)] hover:border-[#8B5CF6]/50 transition-all duration-300 flex flex-col gap-4 group transform-gpu">
             <div className="w-12 h-12 bg-[#8B5CF6]/10 text-[#8B5CF6] border border-[#8B5CF6]/25 rounded-2xl flex items-center justify-center font-mono font-black text-lg shadow-[0_0_10px_rgba(139,92,246,0.2)] animate-pulse">2</div>
             <h3 className="text-xl font-extrabold text-[#F9FAFB] group-hover:text-[#8B5CF6] transition-colors">{t('Express Interest')}</h3>
-            <p className="text-sm font-medium text-[#9CA3AF] leading-relaxed">
-              Found something you love? Tap the <span className="font-extrabold text-[#10B981]">"{t('I Want to Buy This')}"</span> button. This immediately logs an inquiry directly into the Store Manager's dashboard.
-            </p>
+            <p className="text-sm font-medium text-[#9CA3AF] leading-relaxed">{t("Found something you love? Tap the")}<span className="font-extrabold text-[#10B981]">"{t('I Want to Buy This')}"</span>{t("button. This immediately logs an inquiry directly into the Store Manager's dashboard.")}</p>
           </div>
 
           <div className="bg-[#1E293B] rounded-3xl border border-[#334155] p-8 shadow-lg hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:border-[#10B981]/50 transition-all duration-300 flex flex-col gap-4 group transform-gpu">
             <div className="w-12 h-12 bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/25 rounded-2xl flex items-center justify-center font-mono font-black text-lg shadow-[0_0_10px_rgba(16,185,129,0.2)]">3</div>
             <h3 className="text-xl font-extrabold text-[#F9FAFB] group-hover:text-[#10B981] transition-colors">{t('Coordinated Checkout')}</h3>
-            <p className="text-sm font-medium text-[#9CA3AF] leading-relaxed">
-              The Store Manager reviews your buying requests in real-time, contacts you via phone/WhatsApp, and arranges convenient delivery or pickup options.
-            </p>
+            <p className="text-sm font-medium text-[#9CA3AF] leading-relaxed">{t("The Store Manager reviews your buying requests in real-time, contacts you via phone/WhatsApp, and arranges convenient delivery or pickup options.")}</p>
           </div>
         </div>
       </section>
@@ -103,9 +94,7 @@ export default function Landing() {
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-[#F9FAFB] leading-tight">
             {t('Building Sustainable Community Markets')}
           </h2>
-          <p className="text-sm font-medium text-[#9CA3AF] leading-relaxed">
-            By eliminating unnecessary middle-layers, Tiorkhali Mart ensures that every rupee you spend directly rewards the hands that crafted the product. This creates a direct economic lift within rural ecosystems, nurturing micro-entrepreneurship and preserving cultural assets.
-          </p>
+          <p className="text-sm font-medium text-[#9CA3AF] leading-relaxed">{t("By eliminating unnecessary middle-layers, Tiorkhali Mart ensures that every rupee you spend directly rewards the hands that crafted the product. This creates a direct economic lift within rural ecosystems, nurturing micro-entrepreneurship and preserving cultural assets.")}</p>
           <div className="flex gap-6">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-[#10B981]" />
@@ -124,24 +113,22 @@ export default function Landing() {
             </div>
             <div>
               <p className="text-[9px] font-black uppercase text-[#8B5CF6] tracking-widest font-mono">{t('Chief Developer')}</p>
-              <h3 className="text-xl font-black text-[#F9FAFB]">Mahim Ali Sekh</h3>
+              <h3 className="text-xl font-black text-[#F9FAFB]">{t('Mahim Ali Sekh')}</h3>
             </div>
           </div>
-          <p className="text-xs font-medium text-[#9CA3AF] leading-relaxed italic border-l-2 border-[#10B981] pl-4">
-            "We envision a platform where local micro-entrepreneurs can declare their inventories and have them beautifully discovered directly by customers in nearby regions, keeping community capitalism healthy and sustainable."
-          </p>
+          <p className="text-xs font-medium text-[#9CA3AF] leading-relaxed italic border-l-2 border-[#10B981] pl-4">{t("\"We envision a platform where local micro-entrepreneurs can declare their inventories and have them beautifully discovered directly by customers in nearby regions, keeping community capitalism healthy and sustainable.\"")}</p>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="mt-8 pt-8 border-t border-[#334155] flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold text-[#9CA3AF] uppercase tracking-wider font-mono">
         <div className="flex items-center gap-2">
-          <span className="w-7 h-7 bg-[#10B981] text-[#0B0F19] flex items-center justify-center rounded-lg font-black text-sm shadow-[0_0_10px_#10B981]">T</span>
-          <span className="text-[#F9FAFB] font-black">TIORKHALI MART</span>
+          <span className="w-7 h-7 bg-[#10B981] text-[#0B0F19] flex items-center justify-center rounded-lg font-black text-sm shadow-[0_0_10px_#10B981]">{t('T')}</span>
+          <span className="text-[#F9FAFB] font-black">{t('TIORKHALI MART')}</span>
         </div>
         <div className="text-center md:text-right space-y-1">
-          <p>Developed with passion by <span className="text-[#10B981] font-black">Mahim Ali Sekh</span></p>
-          <p className="text-[10px] text-[#475569]">© 2026 Tiorkhali Mart. All Rights Reserved.</p>
+          <p>{t('Developed with passion by')} <span className="text-[#10B981] font-black">{t('Mahim Ali Sekh')}</span></p>
+          <p className="text-[10px] text-[#475569]">{t("© 2026 Tiorkhali Mart. All Rights Reserved.")}</p>
         </div>
       </footer>
     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Search, Filter, MapPin, Phone, Truck, Package, Store, Star, MessageSquare, X, ChevronLeft, ChevronRight, AlertCircle, CheckCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useT } from '../components/Translate';
 
 const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (id: string) => Promise<boolean> }) => {
@@ -96,7 +96,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
         {/* Visual Layer */}
         <div className="relative w-full aspect-[4/3] bg-[#0F172A] overflow-hidden">
           {hasImages ? (
-            <img src={images[cardImageIdx]} alt={p.name} className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-500 transform-gpu" />
+            <img src={images[cardImageIdx]} alt={t(p.name)} className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-500 transform-gpu" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Package className="w-12 h-12 text-[#475569]" />
@@ -106,8 +106,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
           {/* Offer Badge (Electric Violet with cyber pulse animation) */}
           {p.offer > 0 && (
             <div className="absolute top-3 left-3 bg-[#8B5CF6] text-[#F9FAFB] text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded shadow-md z-10 animate-cyber-pulse shadow-[0_0_12px_rgba(139,92,246,0.5)] border border-[#A78BFA]/30">
-              {p.offer}% OFF
-            </div>
+              {p.offer}{t("% OFF")}</div>
           )}
 
           {/* Carousel Arrows */}
@@ -131,8 +130,8 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
 
         {/* Content Layer */}
         <div className="p-5 flex-1 flex flex-col relative bg-[#1E293B]">
-          <p className="text-[10px] font-black uppercase text-[#10B981] tracking-widest mb-1.5 font-mono">{(p.category || '').toLowerCase()}</p>
-          <h3 className="text-base font-bold text-[#F9FAFB] tracking-tight leading-snug break-words mb-3 line-clamp-2">{p.name}</h3>
+          <p className="text-[10px] font-black uppercase text-[#10B981] tracking-widest mb-1.5 font-mono">{t(p.category || '')}</p>
+          <h3 className="text-base font-bold text-[#F9FAFB] tracking-tight leading-snug break-words mb-3 line-clamp-2">{t(p.name)}</h3>
           
           {/* Stock Indicator */}
           {outOfStock ? (
@@ -141,15 +140,14 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
             </div>
           ) : isLowStock ? (
             <div className="mb-2.5 inline-flex items-center gap-1.5 bg-amber-950/40 text-amber-400 font-bold text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-full border border-amber-900/30 w-max font-mono">
-              <AlertCircle className="w-3 h-3" /> Only {p.quantity} left!
-            </div>
+              <AlertCircle className="w-3 h-3" />{t("Only")}{p.quantity}{t("left!")}</div>
           ) : null}
 
           {/* Meta Badge */}
           <div className="mb-auto">
             {p.deliveryAvailable ? 
-              <p className="text-[9px] uppercase font-bold text-[#10B981] flex items-center gap-1 w-max bg-[#10B981]/10 border border-[#10B981]/20 px-2.5 py-1 rounded-full font-mono"><Truck className="w-3 h-3" /> Home Delivery</p> :
-              <p className="text-[9px] uppercase font-bold text-[#9CA3AF] flex items-center gap-1 w-max bg-[#0B0F19] border border-[#334155] px-2.5 py-1 rounded-full font-mono"><Store className="w-3 h-3" /> Pickup Only</p>
+              <p className="text-[9px] uppercase font-bold text-[#10B981] flex items-center gap-1 w-max bg-[#10B981]/10 border border-[#10B981]/20 px-2.5 py-1 rounded-full font-mono"><Truck className="w-3 h-3" /> {t('Home Delivery')}</p> :
+              <p className="text-[9px] uppercase font-bold text-[#9CA3AF] flex items-center gap-1 w-max bg-[#0B0F19] border border-[#334155] px-2.5 py-1 rounded-full font-mono"><Store className="w-3 h-3" /> {t('Pickup Only')}</p>
             }
           </div>
 
@@ -188,11 +186,10 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
               {hasImages ? (
                 <>
                   <div className="flex-1 w-full relative min-h-0 bg-[#0B0F19] flex items-center justify-center p-3">
-                    <img src={images[modalImageIdx]} alt={p.name} className="max-w-full max-h-full object-contain" />
+                    <img src={images[modalImageIdx]} alt={t(p.name)} className="max-w-full max-h-full object-contain" />
                     {p.offer > 0 && (
                       <div className="absolute top-6 left-6 bg-[#8B5CF6] text-white text-xs font-black uppercase tracking-wider px-3.5 py-1.5 rounded-lg shadow-lg z-10 animate-cyber-pulse border border-[#A78BFA]/30 shadow-[0_0_15px_rgba(139,92,246,0.4)]">
-                        {p.offer}% OFF
-                      </div>
+                        {p.offer}{t("% OFF")}</div>
                     )}
                   </div>
                   {/* Thumbnails */}
@@ -213,7 +210,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-[#0B0F19]">
                   <Package className="w-24 h-24 text-[#334155] mb-4" />
-                  <p className="font-extrabold text-[#9CA3AF] uppercase tracking-widest text-sm font-mono">TIORKHALI MART</p>
+                  <p className="font-extrabold text-[#9CA3AF] uppercase tracking-widest text-sm font-mono">{t('TIORKHALI MART')}</p>
                 </div>
               )}
             </div>
@@ -221,17 +218,17 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
             {/* Right Column: Details */}
             <div className="w-full md:w-[55%] flex-1 flex flex-col bg-[#1E293B] overflow-y-auto">
               <div className="p-6 md:p-10 flex-1">
-                <p className="text-[10px] font-black uppercase text-[#10B981] tracking-widest mb-2 font-mono">{(p.category || '').toLowerCase()}</p>
-                <h2 className="text-2xl md:text-3xl font-black text-[#F9FAFB] leading-tight mb-6">{p.name}</h2>
+                <p className="text-[10px] font-black uppercase text-[#10B981] tracking-widest mb-2 font-mono">{t(p.category || '')}</p>
+                <h2 className="text-2xl md:text-3xl font-black text-[#F9FAFB] leading-tight mb-6">{t(p.name)}</h2>
                 
                 <div className="flex items-center gap-4 mb-8 bg-[#0B0F19] inline-flex px-5 py-3 rounded-2xl border border-[#334155] shadow-inner">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-0.5 font-mono">Final Price</span>
+                    <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-0.5 font-mono">{t('Final Price')}</span>
                     <span className="text-3xl font-black text-[#10B981] drop-shadow-[0_0_10px_rgba(16,185,129,0.25)]">₹{p.actualPrice || p.price}</span>
                   </div>
                   {p.offer > 0 && (
                     <div className="flex flex-col ml-2 border-l pl-5 border-[#334155]">
-                      <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-0.5 font-mono">Original</span>
+                      <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-0.5 font-mono">{t('Original')}</span>
                       <span className="text-xl font-bold text-[#9CA3AF] line-through">₹{p.price}</span>
                     </div>
                   )}
@@ -239,28 +236,26 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
 
                 {outOfStock ? (
                   <div className="mb-6 inline-flex items-center gap-2 bg-red-950/40 text-red-400 font-bold text-xs uppercase tracking-wider px-3.5 py-2.5 rounded-xl border border-red-900/30">
-                    <AlertCircle className="w-4 h-4 text-red-400" /> Out of stock
-                  </div>
+                    <AlertCircle className="w-4 h-4 text-red-400" />{t("Out of stock")}</div>
                 ) : isLowStock ? (
                   <div className="mb-6 inline-flex items-center gap-2 bg-amber-950/40 text-amber-400 font-bold text-xs uppercase tracking-wider px-3.5 py-2.5 rounded-xl border border-amber-900/30">
-                    <AlertCircle className="w-4 h-4 text-amber-400" /> Hurry! Only {p.quantity} left
-                  </div>
+                    <AlertCircle className="w-4 h-4 text-amber-400" />{t("Hurry! Only")}{p.quantity}{t("left")}</div>
                 ) : null}
 
                 <div className="mb-8">
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF] mb-3 border-b border-[#334155] pb-2 font-mono">Description</h4>
-                  <p className="text-sm font-medium text-[#F9FAFB] leading-relaxed whitespace-pre-line">{p.description}</p>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF] mb-3 border-b border-[#334155] pb-2 font-mono">{t('Description')}</h4>
+                  <p className="text-sm font-medium text-[#F9FAFB] leading-relaxed whitespace-pre-line">{t(p.description)}</p>
                 </div>
 
                 <div className="mb-8 bg-[#0B0F19] rounded-2xl border border-[#334155] overflow-hidden shadow-inner">
                   <div className="p-3 md:p-4 border-b border-[#334155] bg-[#1E293B]/60 flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                        <Store className="w-5 h-5 text-[#10B981]" />
-                       <h4 className="text-sm font-black uppercase tracking-wider text-[#F9FAFB] font-mono">Store Info</h4>
+                       <h4 className="text-sm font-black uppercase tracking-wider text-[#F9FAFB] font-mono">{t('Store Info')}</h4>
                     </div>
                     {p.deliveryAvailable ? 
-                      <p className="text-[9px] uppercase font-bold text-[#10B981] bg-[#10B981]/10 border border-[#10B981]/20 px-2.5 py-1 rounded flex items-center gap-1 w-max font-mono"><Truck className="w-3 h-3" /> Delivery Available</p> :
-                      <p className="text-[9px] uppercase font-bold text-[#9CA3AF] bg-[#1E293B] border border-[#334155] px-2.5 py-1 rounded flex items-center gap-1 w-max font-mono"><Store className="w-3 h-3" /> Pickup Only</p>
+                      <p className="text-[9px] uppercase font-bold text-[#10B981] bg-[#10B981]/10 border border-[#10B981]/20 px-2.5 py-1 rounded flex items-center gap-1 w-max font-mono"><Truck className="w-3 h-3" /> {t('Delivery Available')}</p> :
+                      <p className="text-[9px] uppercase font-bold text-[#9CA3AF] bg-[#1E293B] border border-[#334155] px-2.5 py-1 rounded flex items-center gap-1 w-max font-mono"><Store className="w-3 h-3" /> {t('Pickup Only')}</p>
                     }
                   </div>
                   <div className="p-4 space-y-3.5 text-xs font-bold text-[#9CA3AF]">
@@ -295,11 +290,10 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
                     className="flex items-center justify-between cursor-pointer group"
                   >
                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#F9FAFB] flex items-center gap-2 flex-1 font-mono">
-                       <Star className={`w-4 h-4 ${showReviews ? 'text-[#10B981]' : 'text-[#475569] group-hover:text-[#9CA3AF]'} transition-colors`} /> 
-                       Customer Reviews ({reviews.length > 0 ? avgRating : 'New'})
+                       <Star className={`w-4 h-4 ${showReviews ? 'text-[#10B981]' : 'text-[#475569] group-hover:text-[#9CA3AF]'} transition-colors`} />{t("Customer Reviews (")}{reviews.length > 0 ? avgRating : t('New')})
                      </h4>
                      <button className="text-[10px] font-bold text-[#10B981] cursor-pointer bg-[#10B981]/15 border border-[#10B981]/25 px-3.5 py-1.5 rounded-full hover:bg-[#10B981]/25 transition-colors">
-                        {showReviews ? 'Hide' : 'Show Reviews'}
+                        {showReviews ? t('Hide') : t('Show Reviews')}
                      </button>
                   </div>
 
@@ -308,7 +302,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
                       {user?.role === 'customer' && (
                         <form onSubmit={submitReview} className="mb-6 bg-[#1E293B] p-4 rounded-xl border border-[#334155] shadow-sm">
                           <div className="flex items-center justify-between mb-3">
-                            <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider font-mono">Your Rating:</span>
+                            <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider font-mono">{t('Your Rating:')}</span>
                             <div className="flex bg-[#0B0F19] p-1 rounded-lg border border-[#334155]">
                               {[1,2,3,4,5].map(n => (
                                 <button
@@ -324,21 +318,21 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
                           </div>
                           <textarea 
                             required
-                            placeholder="Write your review here... Be completely honest."
+                            placeholder={t('Write your review here... Be completely honest.')}
                             value={newReview.text}
                             onChange={e => setNewReview(prev => ({...prev, text: e.target.value}))}
                             className="w-full text-xs font-semibold p-3 border border-[#334155] rounded-xl outline-none focus:border-[#10B981] mb-3 resize-none bg-[#0B0F19] text-[#F9FAFB] placeholder-[#475569] transition-colors min-h-[4rem]"
                             rows={2}
                           />
                           <button type="submit" disabled={submittingReview} className="w-full bg-[#10B981] text-[#0B0F19] text-[10px] uppercase tracking-wider font-extrabold py-3 rounded-xl hover:opacity-90 transition-colors shadow-md cursor-pointer">
-                            {submittingReview ? 'Submitting...' : 'Post Review'}
+                            {submittingReview ? t('Submitting...') : t('Post Review')}
                           </button>
                         </form>
                       )}
 
                       <div className="space-y-3.5 max-h-64 overflow-y-auto pr-1">
                         {reviews.length === 0 ? (
-                          <p className="text-xs text-[#9CA3AF] font-bold text-center py-6 bg-[#1E293B]/30 rounded-xl border border-[#334155]/60 font-mono">No reviews yet. Be the first!</p>
+                          <p className="text-xs text-[#9CA3AF] font-bold text-center py-6 bg-[#1E293B]/30 rounded-xl border border-[#334155]/60 font-mono">{t('No reviews yet. Be the first!')}</p>
                         ) : (
                           reviews.map(r => (
                             <div key={r._id} className="bg-[#1E293B] border border-[#334155] p-4 rounded-xl shadow-sm">
@@ -350,7 +344,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
                                   ))}
                                 </div>
                               </div>
-                              <p className="text-xs text-[#9CA3AF] font-medium leading-relaxed">{r.text}</p>
+                              <p className="text-xs text-[#9CA3AF] font-medium leading-relaxed">{t(r.text)}</p>
                             </div>
                           ))
                         )}
@@ -369,8 +363,10 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
 }
 
 export default function Marketplace() {
+  const [searchParams] = useSearchParams();
   const [products, setProducts] = useState<any[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('search') || '');
+  useEffect(() => { setSearch(searchParams.get('search') || ''); }, [searchParams]);
   const [category, setCategory] = useState('');
   const [deliveryOnly, setDeliveryOnly] = useState(false);
   const [selectedStore, setSelectedStore] = useState('');
@@ -439,11 +435,11 @@ export default function Marketplace() {
             onChange={(e) => setCategory(e.target.value)}
           >
             <option value="">{t('All Categories')}</option>
-            <option value="Groceries">Groceries</option>
-            <option value="Handicrafts">Handicrafts</option>
-            <option value="Electronics">Electronics</option>
-            <option value="Clothing">Clothing</option>
-            <option value="Hardware">Hardware</option>
+            <option value="Groceries">{t('Groceries')}</option>
+            <option value="Handicrafts">{t('Handicrafts')}</option>
+            <option value="Electronics">{t('Electronics')}</option>
+            <option value="Clothing">{t('Clothing')}</option>
+            <option value="Hardware">{t('Hardware')}</option>
           </select>
           <select
             className="px-4 py-3 bg-[#0B0F19] text-[#F9FAFB] font-bold border border-[#334155] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#10B981] transition-all cursor-pointer"
@@ -458,7 +454,7 @@ export default function Marketplace() {
           <label className="flex items-center justify-center gap-3 border border-[#334155] bg-[#0B0F19] px-6 py-3 rounded-2xl cursor-pointer hover:bg-[#1E293B] transition-all duration-300 select-none">
             <input type="checkbox" className="accent-[#10B981] bg-[#0B0F19] border-[#334155] rounded focus:ring-1 focus:ring-[#10B981] w-4.5 h-4.5 cursor-pointer" 
               checked={deliveryOnly} onChange={(e) => setDeliveryOnly(e.target.checked)} />
-            <span className="text-sm font-bold text-[#F9FAFB]">Delivery Available</span>
+            <span className="text-sm font-bold text-[#F9FAFB]">{t('Delivery Available')}</span>
           </label>
         </div>
       </div>

@@ -40,13 +40,11 @@ export default function Login() {
 
   return (
     <div className="max-w-md mx-auto mt-12 bg-[#1E293B] p-8 border border-[#334155] rounded-[32px] shadow-2xl">
-      <div className="w-16 h-16 bg-[#10B981] rounded-2xl flex items-center justify-center text-[#0B0F19] font-black text-3xl mx-auto mb-6 shadow-[0_0_15px_rgba(16,185,129,0.3)] select-none">
-        T
-      </div>
+      <div className="w-16 h-16 bg-[#10B981] rounded-2xl flex items-center justify-center text-[#0B0F19] font-black text-3xl mx-auto mb-6 shadow-[0_0_15px_rgba(16,185,129,0.3)] select-none">{t("T")}</div>
       <h2 className="text-2xl font-black text-[#F9FAFB] mb-6 text-center tracking-tight">{t('Welcome Back')}</h2>
       {error && (
         <div className="bg-red-950/40 text-red-400 p-3.5 rounded-xl mb-5 text-xs font-bold border border-red-900/30 font-mono">
-          {error}
+          {t(error)}
         </div>
       )}
       <form onSubmit={handleSubmit} className="space-y-5">

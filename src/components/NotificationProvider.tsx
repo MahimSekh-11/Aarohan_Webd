@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Bell } from 'lucide-react';
+import { useT } from './Translate';
 
 interface NotificationContextType {
   notifications: any[];
@@ -79,6 +80,7 @@ export function useNotifications() {
 }
 
 export function NotificationBell() {
+  const t = useT();
   const { notifications, unreadCount, markAsRead, showDropdown, setShowDropdown } = useNotifications();
   const { user } = useAuthStore();
 
@@ -101,11 +103,11 @@ export function NotificationBell() {
       {showDropdown && (
         <div className="absolute left-1/2 -translate-x-[80%] sm:left-auto sm:right-0 sm:translate-x-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-xl border border-[#e2e0d9] overflow-hidden z-50">
           <div className="p-3 border-b border-[#e2e0d9] bg-[#f9f9f7] flex justify-between items-center">
-            <span className="font-bold text-sm text-[#1a1c19]">Notifications</span>
+            <span className="font-bold text-sm text-[#1a1c19]">{t('Notifications')}</span>
           </div>
           <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 && (
-              <div className="p-4 text-center text-xs text-gray-500 font-bold">No notifications yet.</div>
+              <div className="p-4 text-center text-xs text-gray-500 font-bold">{t('No notifications yet.')}</div>
             )}
             {notifications.map(n => (
               <div 
@@ -113,7 +115,7 @@ export function NotificationBell() {
                 onClick={() => { if (!n.read) markAsRead(n._id); }}
                 className={`p-3 border-b border-[#e2e0d9] text-xs cursor-pointer ${n.read ? 'bg-white opacity-60' : 'bg-[#e7f0e6] text-[#1a1c19] font-medium'}`}
               >
-                <p>{n.message}</p>
+                <p>{t(n.message)}</p>
                 <p className="text-[10px] mt-1 text-gray-500 font-bold">{new Date(n.createdAt).toLocaleDateString()}</p>
               </div>
             ))}

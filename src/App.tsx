@@ -11,6 +11,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import CustomerDashboard from './pages/CustomerDashboard';
 import Landing from './pages/Landing';
 import VoiceAgent from './components/VoiceAgent';
+import { useLanguageStore } from './store/useLanguageStore';
 
 import { NotificationProvider } from './components/NotificationProvider';
 
@@ -31,6 +32,9 @@ const RootRedirect = () => {
 
 export default function App() {
   const initialize = useAuthStore((state) => state.initialize);
+  const language = useLanguageStore(state => state.currentLang);
+
+  useEffect(() => { document.documentElement.lang = language; }, [language]);
 
   useEffect(() => {
     initialize();
@@ -45,6 +49,8 @@ export default function App() {
           <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/register" element={<Register />} />

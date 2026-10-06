@@ -3,6 +3,7 @@
 // No API call needed - all translations are built in here
 // =========================================================
 
+import { offline, offlineLower, aliases } from './offline';
 export type Language = 'en' | 'hi' | 'bn' | 'ta' | 'te' | 'mr' | 'gu';
 
 export const LANGUAGE_NAMES: Record<Language, string> = {
@@ -409,5 +410,5 @@ export const translations: Record<Language, Translations> = {
 
 export function t(text: string, lang: Language): string {
   if (!text || lang === 'en') return text;
-  return translations[lang]?.[text] ?? text;
+  return offline[lang]?.[text] ?? translations[lang]?.[text] ?? offline[lang]?.[aliases[text]] ?? offlineLower[lang]?.[text.trim().toLowerCase()] ?? text;
 }

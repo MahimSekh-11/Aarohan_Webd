@@ -122,3 +122,15 @@ PORT=3000
 <img width="572" height="1024" alt="image" src="https://github.com/user-attachments/assets/d6cf0f90-f7cd-4215-a815-08e9e1473990" />
 
 *Created with 💜 for rural entrepreneurship and community self-reliance.*
+
+## Languages and voice assistant
+
+Use the language menu to choose English, Hindi, Bengali, Tamil, Telugu, Marathi, or Gujarati. Page labels, buttons, headings, statuses, and assistant replies are bundled with the app and change immediately without downloading AI models. Personal names and store brands remain unchanged. Common product names also have bundled translations; other catalog descriptions and reviews use server translation with automatic source-script detection.
+
+The microphone opens an assistant with a live transcript and a typed-command option. Browser speech recognition uses the chosen native locale. Examples: `find rice`, `चावल खोजो`, `চাল খুঁজুন`, `அரிசி தேடு`, `బియ్యం వెతుకు`, `तांदूळ शोधा`, or `ચોખા શોધો`. The assistant can search products, open the marketplace, dashboard or requests, and prepare a product listing for a signed-in manager. Product creation always requires confirmation, by button or a native yes/confirm command. Include a name and numeric price, such as `চাল যোগ করুন ২০০ টাকা`.
+
+If browser speech recognition is unavailable, select **Use audio fallback**. This captures mono PCM WAV directly, so it does not rely on decoding WebM or MP4 recordings. The server uses multilingual Whisper with the selected language. The fallback downloads `Xenova/whisper-base` on first use; set `WHISPER_MODEL` to choose another compatible multilingual Whisper model. Dynamic catalog translation downloads the NLLB model on first use. Both downloads need network access and sufficient memory; static interface translation and native text commands work without these models.
+
+Microphone recording requires localhost or HTTPS and browser permission. Browser recognition availability varies; some browsers send audio to their recognition service. Spoken replies use an installed voice matching the chosen language. When that voice is missing, the assistant shows the reply as text and explains why. See [MDN's speech recognition documentation](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition).
+
+Validation: `npm run lint`, `npm test`, and `npm run build`. For browser integration tests, start Vite at `http://127.0.0.1:5178` and run `npm run test:browser`. These browser tests mock recognition and microphone input; they verify language selection, tool actions, confirmation, and upload format, but do not measure real speech accuracy.

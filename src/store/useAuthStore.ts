@@ -15,9 +15,20 @@ interface AuthState {
   initialize: () => void;
 }
 
+function readStoredAuth(): { token: string | null; user: User | null } {
+  try {
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    if (token && savedUser) {
+      const user = JSON.parse(savedUser);
+      if (user && typeof user._id === 'string' && ['admin','manager','customer'].includes(user.role)) return { token, user };
+    }
+  } catch { /* Missing browser storage or invalid saved session. */ }
+  return { token: null, user: null };
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
-  user: null,
+  ...readStoredAuth(),
   setAuth: (token, user) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));

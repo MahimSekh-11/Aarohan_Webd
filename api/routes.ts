@@ -5,7 +5,9 @@ import { User, Product, Lead } from './models';
 import { authMiddleware, requireRole } from './middleware';
 
 import multer from 'multer';
-const upload = multer({ storage: multer.memoryStorage() });
+import { parseNativeCommand } from '../shared/voiceCommands';
+import { detectTextLanguage, expandProductSearch } from '../shared/languages';
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 export const apiRouter = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'village-ecommerce-secret';
@@ -178,7 +180,8 @@ apiRouter.get('/products', async (req: Request, res: Response) => {
       if (maxPrice) filter.price.$lte = Number(maxPrice);
     }
     if (search) {
-      filter.name = { $regex: search, $options: 'i' };
+      const terms = expandProductSearch(String(search));
+      filter.name = { $regex: terms.map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), $options: 'i' };
     }
 
     const products = await Product.find(filter).sort({ createdAt: -1 });
@@ -351,16 +354,21 @@ apiRouter.post('/ai/transcribe-and-intent', upload.single('audio'), async (req: 
     }
 
     // 1. Transcribe audio to text locally
-    const { transcribeAudio, parseIntent } = await import('./aiService');
-    let transcript = await transcribeAudio(req.file.buffer);
+    const { transcribeAudio, langCodes } = await import('./aiService');
+    const language = req.body.language || 'en';
+    if (!langCodes[language]) { res.status(400).json({ message: 'Unsupported language' }); return; }
+    if (req.file.buffer.toString('ascii', 0, 4) !== 'RIFF' || req.file.buffer.toString('ascii', 8, 12) !== 'WAVE') {
+      res.status(400).json({ message: 'Please provide WAV audio' }); return;
+    }
+    const transcript = await transcribeAudio(req.file.buffer, language);
     
     // 2. Parse intent from text
-    const intent = await parseIntent(transcript);
+    const intent = parseNativeCommand(transcript);
 
     res.json({ transcript, intent });
   } catch (err: any) {
     console.error(err);
-    res.status(500).json({ message: err.message });
+    res.status(503).json({ message: err.message?.startsWith('No speech detected') ? err.message : 'Speech service unavailable. You can type your command.' });
   }
 });
 
@@ -372,15 +380,20 @@ apiRouter.post('/ai/translate', async (req: Request, res: Response): Promise<voi
       return;
     }
     
-    const { translateText } = await import('./aiService');
+    const { translateText, langCodes } = await import('./aiService');
+    if ((sourceLang !== 'auto' && !langCodes[sourceLang]) || !langCodes[targetLang] ||
+      !(typeof text === 'string' || (Array.isArray(text) && text.length <= 100 && text.every(t => typeof t === 'string')))) {
+      res.status(400).json({ message: 'Invalid text or unsupported language' }); return;
+    }
     // If multiple strings in array
     if (Array.isArray(text)) {
-      const translated = await Promise.all(text.map(t => translateText(t, sourceLang, targetLang)));
+      const translated = [];
+      for (const item of text) translated.push(await translateText(item, sourceLang === 'auto' ? detectTextLanguage(item) : sourceLang, targetLang));
       res.json({ translatedText: translated });
       return;
     }
 
-    const translatedText = await translateText(text, sourceLang, targetLang);
+    const translatedText = await translateText(text, sourceLang === 'auto' ? detectTextLanguage(text) : sourceLang, targetLang);
     res.json({ translatedText });
   } catch (err: any) {
     res.status(500).json({ message: err.message });

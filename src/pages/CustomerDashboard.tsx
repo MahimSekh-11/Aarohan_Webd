@@ -3,10 +3,13 @@ import { useAuthStore } from '../store/useAuthStore';
 import { Phone, MapPin, Package, Store, ShoppingBag, ClipboardList } from 'lucide-react';
 import Marketplace from './Marketplace';
 import { useT } from '../components/Translate';
+import { useSearchParams } from 'react-router-dom';
 
 export default function CustomerDashboard() {
+  const [params] = useSearchParams();
   const [leads, setLeads] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'browse' | 'requests'>('browse');
+  useEffect(() => { setActiveTab(params.get('tab') === 'requests' ? 'requests' : 'browse'); }, [params]);
   const { token } = useAuthStore();
   const t = useT();
 
@@ -17,7 +20,8 @@ export default function CustomerDashboard() {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
-        setLeads(data);
+        if (!res.ok) throw new Error(data.message || 'Could not load requests');
+        setLeads(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
       }
@@ -55,13 +59,13 @@ export default function CustomerDashboard() {
               <div className="flex items-center gap-3 mb-4">
                  <div className="w-12 h-12 bg-[#f4f1ea] rounded-xl flex items-center justify-center text-[#2d5a27] shrink-0 overflow-hidden border border-[#e2e0d9]">
                     {(lead.product?.images?.[0] || lead.productDetails?.images?.[0]) ? (
-                      <img src={lead.product?.images?.[0] || lead.productDetails?.images?.[0]} alt={lead.product?.name || lead.productDetails?.name} className="w-full h-full object-cover" />
+                      <img src={lead.product?.images?.[0] || lead.productDetails?.images?.[0]} alt={t(lead.product?.name || lead.productDetails?.name || '')} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="w-6 h-6" />
                     )}
                  </div>
                  <div className="flex-1">
-                   <h3 className="text-sm font-black text-[#1a1c19] leading-tight mb-1">{lead.product?.name || lead.productDetails?.name}</h3>
+                   <h3 className="text-sm font-black text-[#1a1c19] leading-tight mb-1">{t(lead.product?.name || lead.productDetails?.name || '')}</h3>
                    <p className="text-[#2d5a27] font-black">₹{lead.product?.actualPrice ?? lead.product?.price ?? lead.productDetails?.actualPrice ?? lead.productDetails?.price}</p>
                  </div>
               </div>
@@ -74,7 +78,7 @@ export default function CustomerDashboard() {
               </span>
               
               <div className="space-y-2 text-xs font-bold text-gray-600 bg-[#f9f9f7] p-4 border border-[#eeede8] rounded-2xl flex-1">
-                <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-2 border-b border-[#e2e0d9] pb-2">Store Details</p>
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-2 border-b border-[#e2e0d9] pb-2">{t('Store Details')}</p>
                 <p className="flex items-center gap-2 text-[#1a1c19]"><Store className="w-4 h-4 text-gray-400" /> {lead.product?.storeDetails?.storeName || lead.productDetails?.storeDetails?.storeName || 'N/A'}</p>
                 <p className="flex items-center gap-2"><MapPin className="w-4 h-4 text-gray-400" /> {lead.product?.storeDetails?.location || lead.productDetails?.storeDetails?.location || 'N/A'}</p>
                 <p className="flex items-center gap-2 pt-1"><Phone className="w-4 h-4 text-[#d97706]" /> {lead.product?.storeDetails?.contactNumber || lead.productDetails?.storeDetails?.contactNumber || 'N/A'}</p>

@@ -33,6 +33,7 @@ export default function Navbar() {
         <div className="flex items-center gap-1 bg-[#1E293B] border border-[#334155] rounded-lg px-2 py-1">
           <Globe className="w-3 h-3 text-[#10B981] shrink-0" />
           <select
+            aria-label="Language"
             value={currentLang}
             onChange={(e) => setLanguage(e.target.value as Language)}
             className="bg-transparent text-white text-xs sm:text-sm outline-none cursor-pointer"

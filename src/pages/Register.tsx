@@ -48,8 +48,8 @@ export default function Register() {
         <h2 className="text-2xl font-black mb-2 text-[#10B981]">{t('Registration Successful')}</h2>
         <p className="opacity-90 font-medium text-sm text-[#9CA3AF]">
           {formData.role === 'manager'
-            ? "Your store manager account is pending admin approval."
-            : "You can now log in."}
+            ? t("Your store manager account is pending admin approval.")
+            : t("You can now log in.")}
         </p>
         <p className="text-xs mt-6 opacity-80 font-black uppercase tracking-widest font-mono animate-pulse">{t('Redirecting to login...')}</p>
       </div>
@@ -61,7 +61,7 @@ export default function Register() {
       <h2 className="text-2xl font-black text-[#F9FAFB] mb-6 text-center tracking-tight">{t('Create Account')}</h2>
       {error && (
         <div className="bg-red-950/40 text-red-400 p-3.5 rounded-xl mb-4 text-xs font-bold border border-red-900/30 font-mono">
-          {error}
+          {t(error)}
         </div>
       )}
       <form onSubmit={handleSubmit} className="space-y-4">
