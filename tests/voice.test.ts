@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseNativeCommand, normalizeDigits, speechLocales } from '../shared/voiceCommands';
+import { parseNativeCommand, normalizeDigits, speechLocales, isVoiceConfirmation } from '../shared/voiceCommands';
 import { encodeWav } from '../src/lib/audio';
 import { t } from '../src/i18n/translations';
 import { detectTextLanguage, expandProductSearch } from '../shared/languages';
@@ -55,6 +55,8 @@ test('structured product details and delivery remain creation rather than naviga
 });
 test('native confirmation, cancellation, navigation and digits', () => {
   for (const text of ['yes','हाँ','হ্যাঁ','ஆம்','అవును','होय','હા']) assert.equal(parseNativeCommand(text).action, 'confirm');
+  for(const text of ['yes please','হ্যাঁ করুন','हाँ करो','ಹೌದು','അതെ','ਹਾਂ','ہاں'])assert.equal(isVoiceConfirmation(text),true,text);
+  for(const text of ['yes but change the price','no','yes delete all users'])assert.equal(isVoiceConfirmation(text),false,text);
   for (const text of ['cancel','रद्द','বাতিল','ரத்து','రద్దు','રદ']) {
     assert.equal(parseNativeCommand(text).action, 'cancel');
   }

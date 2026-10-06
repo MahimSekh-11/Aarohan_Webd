@@ -7,18 +7,22 @@ import { type AgentRequest, type AgentResult, validateToolCall } from '../../sha
 import { getLLMProvider, LocalLLMProvider, localizeReply } from './providers.js';
 import { executeTool } from './tools.js';
 import { productComplete } from '../../shared/productVoice.js';
+import { naturalSpeechConfigured } from '../speechSynthesis.js';
+import { isVoiceConfirmation } from '../../shared/voiceCommands.js';
 
 export const agentRouter=Router();
 const rates=new Map<string,{count:number;until:number}>();
+agentRouter.use((req,res,next) => { if(req.headers.authorization)void authMiddleware(req,res,next);else next(); });
 agentRouter.use((req,res,next) => {
-  const key=req.ip || 'unknown', now=Date.now();
+  // Read-only capability checks must not exhaust a user's command allowance.
+  if(req.method!=='POST' || req.path!=='/message'){next();return;}
+  const key=req.user ? `user:${req.user._id}` : `ip:${req.ip || 'unknown'}`, now=Date.now();
   if(rates.size>2000)for(const [key,record]of rates)if(record.until<now)rates.delete(key);
   const record=rates.get(key); if(!record || record.until<now)rates.set(key,{count:1,until:now+60000});
   else if(++record.count>40){res.status(429).json({message:'Please wait a moment before sending another message.'});return;}
   next();
 });
-agentRouter.use((req,res,next) => { if(req.headers.authorization)void authMiddleware(req,res,next);else next(); });
-agentRouter.get('/status', (_req,res) => res.json({provider:getLLMProvider().name,languages:Object.keys(agentLanguages),tools:['products','requests','inventory','navigation','account'],cloudSpeech:!!process.env.GEMINI_API_KEY}));
+agentRouter.get('/status', (_req,res) => res.json({provider:getLLMProvider().name,languages:Object.keys(agentLanguages),tools:['products','requests','inventory','navigation','account'],cloudSpeech:!!process.env.GEMINI_API_KEY,ttsProvider:naturalSpeechConfigured()?'gemini':'local'}));
 agentRouter.post('/message', async (req:Request,res:Response) => {
   const started=Date.now(), requestId=randomUUID();
   let language:AgentLanguage='en';
@@ -29,11 +33,11 @@ agentRouter.post('/message', async (req:Request,res:Response) => {
     const context=body.context || {};
     const items=(value:any) => Array.isArray(value) ? value.slice(0,20).filter((item:any) => typeof item?.id==='string' && /^[a-f0-9]{24}$/i.test(item.id) && typeof item.name==='string').map((item:any) => ({id:item.id,name:item.name.slice(0,150),...(['product','request'].includes(item.kind)?{kind:item.kind}:{}),...(typeof item.price==='number' ? {price:item.price} : {})})) : [];
     const history=Array.isArray(body.history) ? body.history.slice(-10).filter((m:any) => ['user','assistant'].includes(m?.role) && typeof m.text==='string').map((m:any) => ({role:m.role,text:m.text.slice(0,1000)})) : [];
-    const input:AgentRequest={message:body.message.trim(),language,history,preferences:{...(typeof body.preferences?.budget==='number' && Number.isFinite(body.preferences.budget) && body.preferences.budget>0 && body.preferences.budget<=1000000?{budget:body.preferences.budget}:{}),...(typeof body.preferences?.category==='string' && ['Groceries','Handicrafts','Electronics','Clothing','Hardware'].includes(body.preferences.category)?{category:body.preferences.category}:{})},context:{route:typeof context.route==='string' ? context.route.slice(0,200) : '/',title:typeof context.title==='string' ? context.title.slice(0,100) : '',visibleItems:items(context.visibleItems),recentItems:items(context.recentItems),search:context.search && typeof context.search==='object' ? context.search : {},draft:context.draft && typeof context.draft==='object' ? context.draft : undefined}};
+    const input:AgentRequest={message:body.message.trim(),language,history,preferences:{...(typeof body.preferences?.budget==='number' && Number.isFinite(body.preferences.budget) && body.preferences.budget>0 && body.preferences.budget<=1000000?{budget:body.preferences.budget}:{}),...(typeof body.preferences?.category==='string' && ['Groceries','Handicrafts','Electronics','Clothing','Hardware'].includes(body.preferences.category)?{category:body.preferences.category}:{})},context:{route:typeof context.route==='string' ? context.route.slice(0,200) : '/',title:typeof context.title==='string' ? context.title.slice(0,100) : '',selectedProductId:typeof context.selectedProductId === 'string' && /^[a-f0-9]{24}$/i.test(context.selectedProductId) ? context.selectedProductId : undefined,visibleItems:items(context.visibleItems),recentItems:items(context.recentItems),search:context.search && typeof context.search==='object' ? context.search : {},draft:context.draft && typeof context.draft==='object' ? context.draft : undefined}};
     if(JSON.stringify(input).length>20000){res.status(400).json({message:'Conversation context is too large'});return;}
     let provider=getLLMProvider();
     const result:AgentResult={reply:'',language,actions:[],provider:provider.name};
-    if(body.pending && /^(yes|confirm|save|हाँ|हां|হ্যাঁ|নিশ্চিত|ஆம்|சரி|అవును|होय|હા)[.!।\s]*$/iu.test(input.message)) {
+    if(body.pending && isVoiceConfirmation(input.message)) {
       if(!req.user)throw new Error('Please log in to use this action.');
       const pending=await AgentAction.findOneAndUpdate({_id:String(body.pending),userId:req.user._id,consumed:false,expiresAt:{$gt:new Date()}},{$set:{consumed:true}},{returnDocument:'after'});
       if(!pending)throw new Error('This confirmation has expired or was already used.');
@@ -61,14 +65,14 @@ agentRouter.post('/message', async (req:Request,res:Response) => {
         const output=await executeTool(call,{user:req.user,language});
         result.reply=output.message;
         if(output.result?.count !== undefined)result.reply=`${await localizeReply(output.message,language)}: ${output.result.count}.`;
-        if(output.result?.name && call.name==='get_product')result.reply=`${await localizeReply(output.message,language)}: ${output.result.name}, ₹${output.result.price}.`;
+        if(output.result?.name && ['get_product','request_product'].includes(call.name))result.reply=`${await localizeReply(output.message,language)}: ${output.result.name}, ₹${output.result.price}.`;
         result.actions.push(...output.actions || []);
         if(output.items)result.items=output.items;
         if(output.draft)result.draft=output.draft;
         if(output.search)result.search=output.search;
         if(output.needsConfirmation) {
-          const record=await AgentAction.create({_id:randomUUID(),userId:req.user._id,name:call.name,args:call.args,expiresAt:new Date(Date.now()+300000)});
-          result.pending={id:record._id,name:call.name,args:call.args};break;
+          const record=await AgentAction.create({_id:randomUUID(),userId:req.user._id,name:call.name,args:output.confirmationArgs || call.args,expiresAt:new Date(Date.now()+300000)});
+          result.pending={id:record._id,name:call.name,args:output.confirmationArgs || call.args};break;
         }
       }
     }

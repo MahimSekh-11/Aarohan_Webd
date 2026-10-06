@@ -179,7 +179,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
       {/* Full-Page Detailed View Modal */}
       {cardError && <p className="error-banner" role="alert">{t(cardError)}</p>}
       {showModal && (
-        <div ref={dialog} role="dialog" aria-modal="true" aria-label={t(p.name)} className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 md:p-8 xl:p-12 overflow-hidden bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+        <div ref={dialog} data-selected-product-id={p._id} role="dialog" aria-modal="true" aria-label={t(p.name)} className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 md:p-8 xl:p-12 overflow-hidden bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-[#162638] border border-[#2B4054] w-full max-w-6xl h-[92vh] md:h-[85vh] rounded-2xl md:rounded-[32px] shadow-2xl overflow-hidden flex flex-col md:flex-row relative">
 
             {/* Close Button */}

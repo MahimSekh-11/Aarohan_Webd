@@ -43,7 +43,7 @@ export function normalizeSpokenNumbers(input: string) {
 export function productComplete(product?: Record<string,any> | null) {
   return !!product?.name?.trim() && Number.isFinite(product.price) && product.price > 0 && Number.isInteger(product.quantity) && product.quantity > 0;
 }
-const pricePattern = /(?:₹|\b(?:for|at|rs\.?|rupees|price|cost)\b|कीमत|दाम|প্রাইস|মূল্য|দাম|விலை|ధర|किंमत|કિંમત)\s*(?:is|to|है|হলো|হবে|[:=])?\s*(\d+(?:\.\d+)?)(?:\s*(?:rupees|rs\b|रुपये|रुपया|টাকা|রুপি|ரூபாய்|రూపాయలు|રૂપિયા))?/iu;
+const pricePattern = /(?:₹|\b(?:for|at|rs\.?|rupees|price|priced|costs?)\b|कीमत|दाम|প্রাইস|মূল্য|দাম|விலை|ధర|किंमत|કિંમત)\s*(?:is|to|at|of|है|হলো|হবে|[:=])?\s*(\d+(?:\.\d+)?)(?:\s*(?:rupees|rs\b|रुपये|रुपया|টাকা|রুপি|ரூபாய்|రూపాయలు|રૂપિયા))?/iu;
 const quantityPattern = /(?:\b(?:quantity|stock|units)\b|मात्रा|স্টক|সংখ্যা|পরিমাণ|মজুত|அளவு|పరిమాణం|प्रमाण|જથ્થો)\s*(?:is|[:=])?\s*(\d+(?:\.\d+)?)(?:\s*(?:kg|kilos?|kilograms?|pcs|units?|packets?|किलो|কেজি|கிலோ|కిలో|કિલો))?|(?:(\d+(?:\.\d+)?)\s*(?:kg|kilos?|kilograms?|pcs|units?|packets?|किलो|কেজি|கிலோ|కిలో|કિલો))/iu;
 export function extractProduct(text: string, add: RegExp, previous?: Record<string,any> | null) {
   const normalized = normalizeSpokenNumbers(text.replace(/(?:^|\s)(?:একটি|একটা)(?=\s|$)/gu,' ')).replace(/(?<=\d),(?=\d)/g,'');
@@ -60,7 +60,7 @@ export function extractProduct(text: string, add: RegExp, previous?: Record<stri
   if (category) product.category = category[1].trim();
   let name = normalized.replace(new RegExp(add.source,add.flags.includes('g') ? add.flags : add.flags+'g'),'').replace(price?.[0] || /$^/,'').replace(quantity?.[0] || /$^/,'')
     .replace(delivery?.[0] || /$^/,'').replace(description?.[0] || /$^/,'').replace(category?.[0] || /$^/,'')
-    .replace(/\b(new|a|an|of|product|please|called|named|name|is|at|rupees|change|set|update|units|kilograms|kg|pcs)\b|নতুন|পণ্যের নাম|নামে|নাম|প্রোডাক্ট|একটি|একটা|পণ্য|जोड़ दीजिए|उत्पाद|தயாரிப்பு|ఉత్పత్తి|ઉત્પાદન/giu,'')
+    .replace(/\b(i|want|would|like|to|with|new|a|an|of|product|item|please|called|named|name|is|at|rupees|change|set|update|units|kilograms|kg|pcs)\b|নতুন|পণ্যের নাম|নামে|নাম|প্রোডাক্ট|আইটেম|একটি|একটা|পণ্য|जोड़ दीजिए|उत्पाद|आइटम|தயாரிப்பு|உత్పత్తి|ઉત્પાદન/giu,'')
     .replace(/[,।.!:="“”]+/g,' ').replace(/\s+/g,' ').trim();
   // A bare amount answers the missing price question; it is never a name.
   if (/^\d+(?:\.\d+)?$/.test(name)) {

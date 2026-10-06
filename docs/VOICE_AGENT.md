@@ -15,7 +15,7 @@ Microphone / typed input
   -> validated registered tools + authenticated database user
   -> actual website data / action
   -> concise translated result
-  -> native system voice or eSpeak WAV
+  -> Gemini natural audio / native system voice / eSpeak WAV
 ```
 
 Typed messages and transcribed messages call the same `POST /api/agent/message` endpoint. The server receives the current route/title, up to 20 visible/recent item references, search constraints and the current product draft; it never receives the page HTML or auth token as model context. JWTs remain request headers handled by authentication middleware. The model never receives a database connection, arbitrary HTTP capability, shell or JavaScript execution capability.
@@ -26,7 +26,11 @@ The model chooses a structured plan. The server validates all calls before runni
 
 Start voice explicitly with the floating microphone or the panel microphone. Native browser recognition uses the selected locale and a parallel PCM recording provides fallback if browser recognition fails. Automatic language mode uses server transcription and retains the detected language. No account is required to browse/search or use public page controls; product creation requires an approved store-manager session.
 
-The panel shows ready, listening, processing, speaking and error states, a live transcript, typed input, mute, replay, stop, language, clear conversation and memory controls. If a product is incomplete, the agent asks for missing fields and resumes listening after speaking during the explicitly started voice session. The stop microphone control ends that session. Complete product commands may save automatically; disable automatic save to review, and low-confidence browser recognition also requires review. Name, price and quantity (whole stock units) remain editable before confirmation.
+The panel shows ready, listening, processing, speaking and error states, a live transcript, typed input, mute, replay, stop, language, clear conversation and memory controls. If a product is incomplete or a buying request needs confirmation, the agent asks and resumes listening after speaking during the explicitly started voice session. The stop microphone control ends that session. Complete product commands may save automatically; disable automatic save to review, and low-confidence browser recognition also requires review. Name, price and quantity (whole stock units) remain editable before confirmation.
+
+Buying phrases such as `order this item` create the site's buying inquiry after confirmation. An open product dialog supplies the selected ID; named/ordinal references and a single result also work. Multiple unselected results require a choice instead of silently buying the first. `order honey` resolves available approved-store listings by name; a unique match is confirmed using its fixed product ID, and multiple matches open the filtered catalog. `show my orders` opens existing inquiries. Search strips conversational filler and marketplace phrases, and item creation takes precedence over search words inside product details.
+
+Speech prefers configured Gemini natural audio, then a matching installed browser voice, then local eSpeak. Browser voices are loaded asynchronously and ranked by locale/quality. Long native utterances are split at word/sentence boundaries and playback retains references, handles cancellation, and has a completion timeout. Local eSpeak uses integer words per minute (150 for native replies, 165 for English), rather than the erroneous browser rate ratio that previously became zero. WAV uses the actual engine sample rate; legacy cloud PCM is wrapped at its declared sample rate to avoid distorted playback.
 
 Speech capture is capped at 30 seconds. PCM WAV avoids browser codec mismatches. STT requests have a timeout; model reasoning, translation, text requests and fallback speech playback also have bounded waits. Permission denial, unsupported microphone environments, provider failure, silence and malformed requests produce readable messages and keep typed input usable. A failed cloud STT request offers retry/typed input; it does not silently upload the recording to a different cloud service.
 
@@ -68,6 +72,9 @@ Examples:
 - Manager: `add rice price two hundred rupees quantity five units`
 - Manager: `add new product`, then answer the name and price questions
 - Customer after selecting a result: `Buy this`, then `confirm`
+- Customer with an open product: `order this item`, then `yes please` / `এটা অর্ডার করো`, then `হ্যাঁ করুন`
+- Customer: `order honey` (choose a listing if more than one store offers it)
+- Manager: `add item rice price 200 quantity 5`
 - Manager: `show my requests`, then `Complete the first request`, then `confirm`
 - `Change my name to New Name`, then `confirm`
 - `Remember that I prefer Bengali.` / `Forget that I prefer Bengali.`
@@ -89,13 +96,19 @@ Use Node.js **22** and copy `.env.example` to `.env` for local development. On V
 | STT_API_KEY | Optional separate Gemini key for transcription |
 | STT_PROVIDER | `gemini` or `local`; without a key uses local Whisper |
 | STT_MODEL | Defaults to `gemini-2.5-flash` |
-| WHISPER_MODEL | Defaults to `Xenova/whisper-base` for local multilingual transcription |
+| TTS_API_KEY | Optional separate Gemini key for natural spoken replies; otherwise uses GEMINI_API_KEY |
+| TTS_PROVIDER | `gemini` or `local`; without a key uses browser/native local fallback |
+| TTS_MODEL | Defaults to `gemini-3.8-flash-tts`; may select an enabled legacy TTS model |
+| TTS_VOICE | Defaults to `Kore`; a supported Gemini prebuilt voice |
+| WHISPER_MODEL | Defaults to `Xenova/whisper-small` for local multilingual transcription |
 | PORT | Standalone host, defaults to 3000 |
 | ADMIN_PHONE / ADMIN_PASSWORD / ADMIN_NAME | Optional one-time administrator provisioning script |
 
-No TTS API key is required: the implementation uses installed native voices or local eSpeak. Provider interfaces are defined in `backend/agent/providers.ts`, `backend/agent/speech.ts`, the frontend speech hooks, and `src/agent/memory.ts`. The official SDK's structured responses are described in [Google's structured-output documentation](https://ai.google.dev/gemini-api/docs/structured-output); inline audio processing is documented in [Google's audio guide](https://ai.google.dev/gemini-api/docs/audio).
+No TTS API key is required for the corrected local speech engine or installed native voices. Natural cloud speech requires an enabled TTS model and GEMINI_API_KEY or TTS_API_KEY; unavailable cloud speech falls back to the native/local path. Test voices on the actual device: synthetic local voices have pronunciation/expressiveness limits. Provider interfaces are defined in `backend/agent/providers.ts`, `backend/agent/speech.ts`, the frontend speech hooks, and `src/agent/memory.ts`. The official SDK's structured responses are described in [Google's structured-output documentation](https://ai.google.dev/gemini-api/docs/structured-output); inline audio processing is documented in [Google's audio guide](https://ai.google.dev/gemini-api/docs/audio), and natural speech generation in [Google's TTS guide](https://ai.google.dev/gemini-api/docs/generate-content/speech-generation).
 
 For production Vercel speech, configure Gemini rather than relying on a Whisper/NLLB cold-start download. Local Whisper downloads/cache need network, memory and time; NLLB is large enough to exceed serverless temporary-storage limits. The build keeps server bundles in private `build/`, while `dist/` contains only frontend assets. `api/index.js` imports the bundled ESM handler with resolved local modules. The same handler is reused by the standalone host. A configured database outage never silently switches to temporary storage.
+
+The local default is now Whisper Small. In the real synthesized-audio regression, Whisper Base misheard `Search for honey` as a search for `her`, while Small transcribed `Search for Honey` correctly. This is a measured improvement for that fixture, not a guarantee for every accent/noisy microphone. Small needs more memory and cold-start download time than Base. Explicit WHISPER_MODEL settings still take precedence. The compatible model is documented on [Xenova's model card](https://huggingface.co/Xenova/whisper-small).
 
 ## Database and confirmations
 
@@ -117,7 +130,7 @@ Browser recognition can send audio to the browser's speech service. Cloud fallba
 
 Every action uses a server-maintained allowlist, typed argument validation, escaped search expressions, authenticated database users, status/role checks and ownership queries. Prompt/context/product strings are untrusted data. Tools cannot execute arbitrary code, URLs, SQL, shell, file operations or HTTP requests. Mutations reject extra ownership/role fields; forms recalculate discounted prices on the server. Signup permits only customer/manager accounts. Async routes return controlled JSON errors rather than stack traces. The notification provider safely handles browsers without desktop notifications and no longer requests notification permission automatically.
 
-Pending action IDs cannot be reused or confirmed by a different user. Risky product edits/deletion, profile updates, buying inquiries and request status changes require confirmation. Client request locking prevents overlapping submissions. Agent traffic has a per-process 40-request/minute IP limit and bounded input/context; production multi-instance deployments should also use their host's distributed rate limiting/WAF. Development request logs include IDs, language, provider, action kinds and latency rather than transcripts, tokens or passwords. Stop/cancel releases microphone resources and aborts frontend requests; a completed server mutation is not rolled back merely because a panel is closed. If a network timeout obscures a creation result, inspect inventory before repeating the command.
+Pending action IDs cannot be reused or confirmed by a different user. Risky product edits/deletion, profile updates, buying inquiries and request status changes require confirmation. Client request locking prevents overlapping submissions. Agent messages have a per-process 40-message/minute limit per authenticated account (or guest IP); capability/status reads do not consume it and bounded input/context; production multi-instance deployments should also use their host's distributed rate limiting/WAF. Development request logs include IDs, language, provider, action kinds and latency rather than transcripts, tokens or passwords. Stop/cancel releases microphone resources and aborts frontend requests; a completed server mutation is not rolled back merely because a panel is closed. If a network timeout obscures a creation result, inspect inventory before repeating the command.
 
 ## Running and testing
 
@@ -143,7 +156,7 @@ npm run test:deployment
 npm run test:speech-http
 ```
 
-`npm test` checks intent/search follow-ups, all native scripts, hybrid detection, memory, malicious arguments, product validation, PCM decoding and actual native synthesized WAV output in eleven base languages. `test:agent` uses a real isolated MongoDB replica set and HTTP requests to check role/ownership, creation, budget filtering, one-use/expired confirmations, concurrent fulfillment, profile updates, native replies and simulated provider outages/malformed plans. `test:browser` uses isolated real APIs/database with simulated microphone/STT/TTS for six non-English UI languages, text/voice actions, multi-turn creation, confidence review, backend recovery, denial, preference forgetting, account forms, dialog keyboard controls and widths 320/375/768/1440. Screenshots are written to ignored `tests/artifacts/`.
+`npm test` checks intent/search follow-ups, all native scripts, hybrid detection, memory, malicious arguments, product validation, PCM decoding and actual native synthesized WAV output in eleven base languages. `test:agent` uses a real isolated MongoDB replica set and HTTP requests to check role/ownership, creation, budget filtering, one-use/expired confirmations, concurrent fulfillment, profile updates, native replies and simulated provider outages/malformed plans. `test:browser` uses isolated real APIs/database with simulated microphone/STT/TTS for six non-English UI languages, text/voice actions, multi-turn creation, selected-product voice ordering with spoken native confirmation, confidence review, backend recovery, denial, preference forgetting, account forms, dialog keyboard controls and widths 320/375/768/1440. Screenshots are written to ignored `tests/artifacts/`.
 
 `test:deployment` imports the exact Vercel handler with plain Node and checks bundled module resolution, private server output, JSON errors, synthesis and isolated database connection failures. `test:speech-http` uses real local synthesis and Whisper transcription of a known synthesized command; it requires the downloaded Whisper model. This confirms service functionality rather than human accent/noise accuracy.
 

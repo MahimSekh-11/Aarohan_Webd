@@ -14,6 +14,7 @@ import { useAgentMemory } from '../agent/memory';
 import { getWebsiteContext } from '../agent/context';
 import { t as translateReply } from '../i18n/translations';
 import { parseMemoryInstruction } from '../../shared/memoryCommands';
+import { isVoiceConfirmation, isVoiceCancellation } from '../../shared/voiceCommands';
 
 export default function VoiceAgent() {
   const t=useT(),navigate=useNavigate();
@@ -56,18 +57,18 @@ export default function VoiceAgent() {
     if(locked.current || !value.trim())return;setError('');setText('');
     const messages=[...history,{role:'user',text:value}] as AgentMessage[];setHistory(messages.slice(-20));
     if(rememberCommand(value))return;
-    if(/^(cancel|no|stop|না|বাতিল|रद्द|नहीं)[.!\s]*$/iu.test(value)){setDraft(null);setPending(null);task.current.draft=undefined;followup.current=false;respond('Cancelled');return;}
+    if(isVoiceCancellation(value)){setDraft(null);setPending(null);task.current.draft=undefined;followup.current=false;voiceSession.current=false;respond('Cancelled');return;}
     locked.current=true;setBusy(true);output.stop();
     const controller=new AbortController();request.current=controller;const timer=setTimeout(() => controller.abort(new DOMException('Timed out','TimeoutError')),45000);
     try {
-      const reviewing=override || (/^(yes|confirm|save|হ্যাঁ|নিশ্চিত|हाँ|हां|ஆம்|అవును|होय|હા)[.!।\s]*$/iu.test(value) && draft ? draft : undefined);
+      const reviewing=override || (isVoiceConfirmation(value) && draft ? draft : undefined);
       const body={message:reviewing ? `add product name ${reviewing.name}, price ${reviewing.price}, quantity ${reviewing.quantity}` : value,language:language==='auto' && detected?detected:language,history:messages.slice(-10),context:{...getWebsiteContext(),recentItems:task.current.items,search:task.current.search,draft:reviewing || task.current.draft},pending:pending?.id,autoSave:reviewing ? true : autoSave,confident,preferences:memory.enabled ? {budget:memory.budget,category:memory.category} : {}};
       const response=await fetch('/api/agent/message',{method:'POST',headers:{'Content-Type':'application/json',...(token ? {Authorization:`Bearer ${token}`} : {})},body:JSON.stringify(body),signal:controller.signal});
       const result:AgentResult=await response.json();if(!response.ok || !result.reply)throw new Error((result as any).message || 'The assistant could not finish this request. Please try again.');
       if(!alive.current || controller.signal.aborted)return;
       setDraft(result.draft || null);setPending(result.pending || null);task.current.draft=result.draft;
       if(result.items)task.current.items=result.items;if(result.search)task.current.search=result.search;
-      followup.current=!!result.draft && !productComplete(result.draft);
+      followup.current=!!result.pending || (!!result.draft && !productComplete(result.draft));
       for(const action of result.actions){
         if(action.type==='navigate' && action.path && /^\/(?!\/)/.test(action.path))navigate(action.path);
         if(action.type==='refresh'){window.dispatchEvent(new Event('products-updated'));window.dispatchEvent(new Event('requests-updated'));window.dispatchEvent(new Event('account-updated'));}

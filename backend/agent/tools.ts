@@ -7,7 +7,7 @@ import { updateRequestStatus } from '../requestService.js';
 import { productFields, profileFields, productSnapshot } from '../validation.js';
 
 export type ToolEnvironment = { user?:any; language:string };
-export type ToolOutput = { message:string; result?:any; actions?:AgentResult['actions']; items?:any[]; draft?:Record<string,any>; search?:Record<string,unknown>; needsConfirmation?:boolean };
+export type ToolOutput = { message:string; result?:any; actions?:AgentResult['actions']; items?:any[]; draft?:Record<string,any>; search?:Record<string,unknown>; needsConfirmation?:boolean; confirmationArgs?:Record<string,unknown> };
 export const sensitiveTools = new Set(['update_product','delete_product','request_product','update_request','update_profile']);
 const checkRole = (user:any, roles:string[]) => {
   if (!user) throw new Error('Please log in to use this action.');
@@ -89,8 +89,17 @@ export async function executeTool(call:ToolCall, env:ToolEnvironment, confirmed=
     },
     request_product:async () => {
       checkRole(user,['customer']); requireDatabase();
-      const product=await Product.findById(a.id); if(!product || product.quantity<1 || !await User.exists({_id:product.managerId,role:'manager',status:'approved'}))throw new Error('This product is not available.');
-      if(!confirmed)return {message:'Send this buying request to the store? Please confirm.',needsConfirmation:true};
+      let product;
+      if(a.search){
+        const managers=await User.find({role:'manager',status:'approved'}).distinct('_id');
+        const query=expandProductSearch(String(a.search)).map(term=>term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|');
+        const candidates=await Product.find({quantity:{$gt:0},managerId:{$in:managers},name:{$regex:query,$options:'i'}}).sort({createdAt:-1}).limit(21);
+        if(!candidates.length)throw new Error('Product not found.');
+        if(candidates.length>1)return {message:'Please select a product first.',items:candidates.slice(0,20).map(cleanProduct),search:{search:a.search},actions:[{type:'navigate',path:`/marketplace?search=${encodeURIComponent(String(a.search))}`} ]};
+        product=candidates[0];
+      }else product=await Product.findById(a.id);
+      if(!product || product.quantity<1 || !await User.exists({_id:product.managerId,role:'manager',status:'approved'}))throw new Error('This product is not available.');
+      if(!confirmed)return {message:'Send this buying request to the store? Please confirm.',result:cleanProduct(product),needsConfirmation:true,confirmationArgs:{id:String(product._id)}};
       const existing=await Lead.findOne({customer:user._id,product:product._id,status:{$in:['new','contacted']}});
       if(existing)return {message:'You already have an active request for this product.'};
       try{await Lead.create({customer:user._id,activeKey:`${user._id}:${product._id}`,manager:product.managerId,product:product._id,productDetails:productSnapshot(product),customerDetails:{name:user.name,phone:user.phone,address:user.address}});}catch(error){if((error as any)?.code===11000)return {message:'You already have an active request for this product.'};throw error;}

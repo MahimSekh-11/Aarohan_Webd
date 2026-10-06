@@ -4,8 +4,8 @@ export const speechLocales = { en: 'en-IN', hi: 'hi-IN', bn: 'bn-IN', ta: 'ta-IN
 export type VoiceLanguage = keyof typeof speechLocales;
 export type VoiceIntent = { action: 'search_product' | 'navigate' | 'website_control' | 'create_product' | 'confirm' | 'cancel' | 'help' | 'unknown'; message: string; data?: Record<string, any> };
 const commands = {
-  search: /\b(find|search|show|looking for|buy|want)\b|खोजो|खोजें|ढूंढो|दिखाओ|खरीदना|খোঁজো|খোঁজ|সার্চ|খুঁজুন|খুঁজে|দেখাও|দেখান|কিনতে|চাই|தேடு|காட்டு|வாங்க|వెతుకు|చూపించు|కొనాలి|शोधा|दाखवा|खरेदी|શોધો|બતાવો|ખરીદવું/iu,
-  add: /\b(add|create|new product)\b|जोड़ दीजिए|जोड़ो|जोड़ें|जोड़ना|নতুন পণ্য|অ্যাড|এড|যোগ করো|যোগ করুন|சேர்|சேர்க்க|జోడించు|జోడించండి|जोडा|जोडणे|ઉમેરો/iu,
+  search: /\b(find|search|show|looking for|buy|want)\b|खोजो|खोजें|ढूंढो|दिखाओ|खरीदना|খোঁজো|খোঁজ|সার্চ|খুঁজুন|খুঁজে|দেখাও|দেখান|কিনতে|চাই|தேடு|காட்டு|வாங்க|వెతుకు|చూపించు|కొనాలి|शोधा|दाखवा|खरेदी|શોધો|બતાવો|ખરીદવું|ಹುಡುಕಿ|ತೋರಿಸಿ|തിരയൂ|കണ്ടെത്തൂ|ਲੱਭੋ|ਖੋਜੋ|تلاش|ڈھونڈو/iu,
+  add: /\b(add|create|new product|new item)\b|जोड़ दीजिए|जोड़ो|जोड़ें|जोड़ना|নতুন পণ্য|নতুন আইটেম|অ্যাড|এড|যোগ করো|যোগ করুন|சேர்|சேர்க்க|జోడించు|జోడించండి|जोडा|जोडणे|ઉમેરો|ಸೇರಿಸಿ|ചേർക്കൂ|ਜੋੜੋ|شامل کرو/iu,
   confirm: /^(yes|confirm|save|हाँ|हां|पुष्टि|হ্যাঁ|নিশ্চিত|ஆம்|சரி|అవును|होय|હા)[.!।\s]*$/iu,
   cancel: /^(no|cancel|stop|नहीं|रद्द|না|বাতিল|இல்லை|ரத்து|కాదు|రద్దు|नाही|રદ|ના)[.!।\s]*$/iu,
   help: /\b(help|what can you do)\b|मदद|सहायता|সাহায্য|உதவி|సహాయం|મદદ/iu,
@@ -14,6 +14,10 @@ const commands = {
   marketplace: /\b(marketplace|market)\b|बाज़ार|बाजार|বাজার|சந்தை|మార్కెట్|બજાર/iu,
   home: /\b(home|homepage)\b|होम|मुख्य पृष्ठ|হোম|முகப்பு|హోమ్|મુખ્ય પૃષ્ઠ/iu,
 };
+export function isVoiceConfirmation(text:string){
+  return /^(?:yes|confirm|save|okay|ok|हाँ|हां|पुष्टि|হ্যাঁ|নিশ্চিত|ஆம்|சரி|అవును|होय|હા|ಹೌದು|അതെ|ਹਾਂ|جی ہاں|ہاں)(?:[.!।\s]*(?:please|do it|go ahead|confirm|send it|save it|order it|करो|करें|করুন|করো|দাও|செய்))*[.!।\s]*$/iu.test(text.trim());
+}
+export function isVoiceCancellation(text:string){return /^(?:no|cancel|stop|नहीं|रद्द|না|বাতিল|இல்லை|ரத்து|కాదు|రద్దు|नाही|રદ|ના|ಇಲ್ಲ|വേണ്ട|ਨਹੀਂ|نہیں)[.!।\s]*$/iu.test(text.trim());}
 export function normalizeDigits(text: string) {
   return text.replace(/[०-९০-৯௦-௯౦-౯૦-૯]/g, value => {
     const point = value.charCodeAt(0);
@@ -23,8 +27,8 @@ export function normalizeDigits(text: string) {
 }
 export function parseNativeCommand(input: string, role?: string, previous?: Record<string,any> | null): VoiceIntent {
   const text = normalizeDigits(input.trim());
-  if (commands.confirm.test(text)) return { action: 'confirm', message: 'Confirm' };
-  if (commands.cancel.test(text)) return { action: 'cancel', message: 'Cancelled' };
+  if (isVoiceConfirmation(text)) return { action: 'confirm', message: 'Confirm' };
+  if (isVoiceCancellation(text)) return { action: 'cancel', message: 'Cancelled' };
   if (/\b(scroll down|go down)\b|नीचे|নিচে|கீழே|కింద|खाली|નીચે/iu.test(text)) return { action:'website_control', message:'Scrolling down', data:{ command:'scroll_down' } };
   if (/\b(scroll up|go up)\b|ऊपर|উপরে|மேலே|పైకి|वरती|ઉપર/iu.test(text)) return { action:'website_control', message:'Scrolling up', data:{ command:'scroll_up' } };
   if (/\b(go back|previous page)\b|वापस|ফিরে যাও|আগের পৃষ্ঠা|திரும்பு|వెనక్కి|मागे|પાછા/iu.test(text)) return { action:'website_control', message:'Going back', data:{ command:'back' } };

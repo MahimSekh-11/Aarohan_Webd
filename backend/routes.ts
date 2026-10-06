@@ -333,9 +333,11 @@ apiRouter.post('/ai/speak', safe(async (req: Request, res: Response): Promise<vo
     if (typeof text !== 'string' || !text.trim() || text.length > 1000 || !Object.hasOwn(speechLocales, language)) {
       res.status(400).json({ message: 'Invalid speech text or language' }); return;
     }
-    const { synthesizeSpeech } = await import('./speechSynthesis.js');
-    const audio = await synthesizeSpeech(text, language);
-    res.set({ 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store' }).send(audio);
+    if(req.body.provider !== undefined && !['local','gemini'].includes(req.body.provider)){res.status(400).json({message:'Invalid speech provider'});return;}
+    const { synthesizeSpeech, synthesizeNaturalSpeech, naturalSpeechConfigured } = await import('./speechSynthesis.js');
+    const natural=req.body.provider !== 'local' && naturalSpeechConfigured();
+    const audio = await (natural ? synthesizeNaturalSpeech(text,language) : synthesizeSpeech(text, language));
+    res.set({ 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store', 'X-Speech-Provider':natural?'gemini':'local' }).send(audio);
   } catch (error) {
     console.error('Speech synthesis failed:', error);
     res.status(503).json({ message: 'Could not play spoken reply. Tap replay to try again.' });

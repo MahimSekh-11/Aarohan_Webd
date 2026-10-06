@@ -13,6 +13,7 @@ function token(user:any){return jwt.sign({id:user._id,role:user.role},process.en
 async function request(path:string,method='GET',body?:any,actor?:any){const response=await fetch(root+path,{method,headers:{'Content-Type':'application/json',...(actor?{Authorization:`Bearer ${token(actor)}`}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()};}
 async function say(message:string,actor?:any,extra:any={}){return request('/agent/message','POST',{message,language:'en',history:[],context:{route:'/',title:'Mart',visibleItems:[]},...extra},actor);}
 try{
+  for(let i=0;i<45;i++)assert.equal((await request('/agent/status')).status,200,'Capability discovery must not consume message quota');
   await Promise.all([User.init(),Product.init(),Lead.init(),AgentAction.init()]);
   const manager=await user('manager','1111111111'),customer=await user('customer','2222222222'),other=await user('manager','3333333333');
   assert.equal((await request('/auth/register','POST',{role:'admin',name:'Attack',phone:'4444444444',password:'password123'})).status,400);
@@ -27,7 +28,7 @@ try{
   assert.equal((await request('/products?maxPrice=180&sort=price_asc')).body.length,1);
   const search=await say('Find rice under 180',customer);assert.equal(search.body.items.length,1);assert.equal(search.body.items[0].price,160);
   const context={route:'/marketplace',title:'Market',visibleItems:[],recentItems:search.body.items,search:search.body.search};
-  const pending=await say('Buy this',customer,{context});assert.ok(pending.body.pending);assert.equal(await Lead.countDocuments(),0);
+  const pending=await say('Order this item',customer,{context});assert.ok(pending.body.pending);assert.equal(await Lead.countDocuments(),0);
   const attempt=await say('confirm',manager,{pending:pending.body.pending.id});assert.ok(attempt.body.error);assert.equal(await Lead.countDocuments(),0);
   const approved=await say('confirm',customer,{pending:pending.body.pending.id});assert.match(approved.body.reply,/sent/);assert.equal(await Lead.countDocuments(),1);
   assert.equal((await Lead.findOne())!.productDetails!.storeDetails!.storeName,'Test Store');
@@ -59,5 +60,11 @@ try{
   assert.equal((await request(`/admin/managers/${manager._id}/status`,'PUT',{status:'rejected'},admin)).status,200);assert.equal(await Product.countDocuments(),ownedCount);assert.equal((await request('/products')).body.length,0);assert.ok(await User.findById(manager._id));
   assert.equal((await request('/auth/register','POST',{name:'Replacement',role:'manager',phone:manager.phone,password:'password123',storeName:'Store',location:'Village'})).status,403);
   await request(`/admin/managers/${manager._id}/status`,'PUT',{status:'approved'},admin);assert.equal((await request('/products')).body.length,ownedCount);
+  const item=await say('add item honey priced at 120 quantity 3',manager);assert.match(item.body.reply,/saved/);const honey=await Product.findOne({name:'honey'});assert.ok(honey);
+  const found=await say('find this product honey in the marketplace',customer);assert.equal(found.body.items.length,1);assert.equal(found.body.items[0].id,String(honey._id));
+  const byName=await say('order honey',customer);assert.equal(byName.body.pending.args.id,String(honey._id));assert.equal(byName.body.pending.args.search,undefined,'Confirmation freezes the resolved product ID');await say('confirm',customer,{pending:byName.body.pending.id});assert.ok(await Lead.exists({customer:customer._id,product:honey._id}));
+  const selection=await say('এটা অর্ডার করো',customer,{language:'bn',context:{...context,selectedProductId:String(honey._id)}});assert.equal(selection.body.pending.args.id,String(honey._id),'Open dialog wins over older search results');
+  await Product.create({name:'honey',description:'Other honey',category:'Groceries',price:150,actualPrice:150,quantity:2,managerId:other._id});
+  const ambiguous=await say('order honey',customer);assert.equal(ambiguous.body.pending,undefined);assert.equal(ambiguous.body.items.length,2);
   console.log('Agent integration passed: real isolated database; role/ownership validation; create/search/profile; native replies; expiring one-use confirmations; idempotent stock resolution; malformed inputs.');
 }finally{await new Promise<void>(r=>server.close(()=>r()));await mongoose.disconnect();await mongo.stop();}

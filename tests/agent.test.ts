@@ -18,8 +18,31 @@ test('natural searches preserve budgets, references and follow-up constraints',a
   const first=await provider.plan({message:'Find rice under 500',language:'en',history:[],context});assert.equal(first.calls[0].args.search,'rice');
   const next=await provider.plan({message:'Show the cheapest one',language:'en',history:[],context:{...context,search:first.calls[0].args}});assert.equal(next.calls[0].args.maxPrice,500);assert.equal(next.calls[0].args.sort,'price_asc');assert.equal(next.calls[0].args.search,'rice');
   assert.deepEqual((await provider.plan({message:'Open the second one',language:'en',history:[],context})).calls,[{name:'get_product',args:{id:context.recentItems[1].id}}]);
-  assert.equal((await provider.plan({message:'Buy this',language:'en',history:[],context})).calls[0].name,'request_product');
+  assert.equal((await provider.plan({message:'Buy this',language:'en',history:[],context:{...context,selectedProductId:context.recentItems[0].id}})).calls[0].name,'request_product');
   assert.equal((await provider.plan({message:'Book a flight',language:'en',history:[],context})).calls.length,0);
+});
+test('voice buying intent resolves selected, ordinal and named products without guessing',async()=>{
+  const provider=new LocalLLMProvider();
+  const plan=(message:string,extra:any={})=>provider.plan({message,language:'en',history:[],context:{...context,...extra}},'customer');
+  for(const message of ['order this item','buy this product','এটা অর্ডার করো','यह आइटम ऑर्डर करो'])assert.deepEqual((await plan(message,{selectedProductId:context.recentItems[1].id})).calls,[{name:'request_product',args:{id:context.recentItems[1].id}}]);
+  assert.deepEqual((await plan('Order the second item')).calls,[{name:'request_product',args:{id:context.recentItems[1].id}}]);
+  assert.deepEqual((await plan('I want to order Honey')).calls,[{name:'request_product',args:{id:context.recentItems[1].id}}]);
+  assert.equal((await plan('Order this item')).calls.length,0,'Two unselected products must not silently buy the first');
+  assert.deepEqual((await plan('Order product 2')).calls,[{name:'request_product',args:{id:context.recentItems[1].id}}]);
+  assert.deepEqual((await plan('Order milk')).calls,[{name:'request_product',args:{search:'milk'}}]);
+  assert.deepEqual((await plan('আমাকে দুধ অর্ডার করে দাও')).calls,[{name:'request_product',args:{search:'দুধ'}}]);
+  assert.equal((await plan('show my orders')).calls[0].name,'get_requests');
+  assert.equal((await plan('open my requests')).calls[0].name,'get_requests');
+});
+test('spoken search phrases and listing phrases execute the intended action',async()=>{
+  const provider=new LocalLLMProvider();
+  for(const [phrase,search] of [['find this product rice','rice'],['Please find rice in the marketplace','rice'],['search for a honey item','honey'],['আমাকে চাল খুঁজে দাও','চাল'],['মধু সার্চ করুন','মধু'],['चावल खोजो','चावल']]){
+    const result=await provider.plan({message:phrase,language:'en',history:[],context});assert.equal(result.calls[0].name,'search_products');assert.equal(result.calls[0].args.search,search);
+  }
+  for(const phrase of ['add item rice price 200 quantity 5','I want to add a new item named rice priced at 200 with quantity 5']){
+    const result=await provider.plan({message:phrase,language:'en',history:[],context},'manager');assert.equal(result.calls[0].name,'create_product');assert.equal(result.calls[0].args.name,'rice');assert.equal(result.calls[0].args.price,200);assert.equal(result.calls[0].args.quantity,5);
+  }
+  const selected=await provider.plan({message:'find this product',language:'en',history:[],context:{...context,selectedProductId:context.recentItems[1].id}});assert.equal(selected.calls[0].args.id,context.recentItems[1].id);
 });
 test('language detection supports native scripts and mixed transliteration',()=>{
   for(const [text,expected]of [['আমাকে চাল দাও','bn'],['मुझे चावल चाहिए','hi'],['मला तांदूळ पाहिजे','mr'],['அரிசி தேடு','ta'],['బియ్యం వెతుకు','te'],['ચોખા શોધો','gu'],['ಅಕ್ಕಿ','kn'],['അരി','ml'],['ਚੌਲ','pa'],['چاول','ur'],['amar jonno rice dao','banglish'],['mujhe rice chahiye','hinglish']] as const)assert.equal(detectAgentLanguage(text),expected);
