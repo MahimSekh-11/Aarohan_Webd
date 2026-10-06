@@ -368,7 +368,8 @@ export default function Marketplace() {
   const [search, setSearch] = useState(() => searchParams.get('search') || '');
   useEffect(() => { setSearch(searchParams.get('search') || ''); }, [searchParams]);
   const [category, setCategory] = useState('');
-  const [deliveryOnly, setDeliveryOnly] = useState(false);
+  const [deliveryOnly, setDeliveryOnly] = useState(() => searchParams.get('delivery') === 'true');
+  useEffect(() => { setDeliveryOnly(searchParams.get('delivery') === 'true'); }, [searchParams]);
   const [selectedStore, setSelectedStore] = useState('');
   const { user, token } = useAuthStore();
   const navigate = useNavigate();

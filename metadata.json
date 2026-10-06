@@ -1,6 +1,6 @@
 {
   "name": "VillageMart",
   "description": "Hyper-local E-commerce platform for a village ecosystem with Admin, Store Manager, and Customer roles.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

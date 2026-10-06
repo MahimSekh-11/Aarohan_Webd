@@ -4,6 +4,7 @@ import { parseNativeCommand, normalizeDigits, speechLocales } from '../shared/vo
 import { encodeWav } from '../src/lib/audio';
 import { t } from '../src/i18n/translations';
 import { detectTextLanguage, expandProductSearch } from '../shared/languages';
+import { productComplete, normalizeSpokenNumbers } from '../shared/productVoice';
 
 test('native commands preserve native product names in all languages', () => {
   for (const [phrase, expected] of [['find rice','rice'],['चावल खोजो','चावल'],['চাল খুঁজুন','চাল'],['அரிசி தேடு','அரிசி'],['బియ్యం వెతుకు','బియ్యం'],['तांदूळ शोधा','तांदूळ'],['ચોખા શોધો','ચોખા']]) {
@@ -13,10 +14,44 @@ test('native commands preserve native product names in all languages', () => {
 });
 test('product commands require manager role and complete positive pricing', () => {
   assert.equal(parseNativeCommand('add rice for 200 rupees', 'customer').action, 'unknown');
-  assert.equal(parseNativeCommand('add rice', 'manager').action, 'unknown');
-  assert.equal(parseNativeCommand('add rice for 0 rupees', 'manager').action, 'unknown');
+  assert.equal(productComplete(parseNativeCommand('add rice', 'manager').data), false);
+  assert.equal(productComplete(parseNativeCommand('add rice for 0 rupees', 'manager').data), false);
   const draft = parseNativeCommand('চাল যোগ করুন ২০০ টাকা', 'manager');
   assert.equal(draft.action, 'create_product'); assert.equal(draft.data?.price, 200); assert.equal(draft.data?.name, 'চাল');
+});
+test('product agent collects missing fields, spoken amounts and corrections', () => {
+  let draft = parseNativeCommand('add new product','manager').data;
+  assert.equal(draft?.name,undefined);
+  draft = parseNativeCommand('Basmati rice','manager',draft).data;
+  assert.equal(draft?.name,'basmati rice');
+  assert.equal(productComplete(draft),false);
+  draft = parseNativeCommand('price two hundred fifty rupees quantity five units','manager',draft).data;
+  assert.equal(draft?.name,'basmati rice'); assert.equal(draft?.price,250); assert.equal(draft?.quantity,5);
+  assert.equal(productComplete(draft),true);
+  draft = parseNativeCommand('change price to three hundred','manager',draft).data;
+  assert.equal(draft?.price,300); assert.equal(draft?.name,'basmati rice');
+  assert.equal(parseNativeCommand('search honey','manager',draft).action,'search_product');
+  for (const [phrase,amount] of [['চাল যোগ করুন দুইশো টাকা',200],['add rice price two hundred',200],['जोड़ो चावल कीमत दो सौ',200],['அரிசி சேர் விலை இருபது',20],['బియ్యం జోడించు ధర ఇరవై',20],['तांदूळ जोडा किंमत वीस',20],['ચોખા ઉમેરો કિંમત વીસ',20]] as const) {
+    const result = parseNativeCommand(phrase,'manager');
+    assert.equal(result.action,'create_product'); assert.equal(result.data?.price,amount,phrase);
+    assert.equal(productComplete(result.data),true,phrase);
+  }
+  assert.equal(normalizeSpokenNumbers('one thousand two hundred fifty'),'1250');
+  assert.equal(normalizeSpokenNumbers('two zero zero'),'200');
+  assert.equal(normalizeSpokenNumbers('two point five'),'2.5');
+  assert.equal(parseNativeCommand('add honey price 1,200','manager').data?.price,1200);
+  const nativeStock = parseNativeCommand('একটি নতুন পণ্য চাল যোগ করুন দাম দুইশো টাকা স্টক পাঁচটি','manager');
+  assert.equal(nativeStock.data?.name,'চাল'); assert.equal(nativeStock.data?.quantity,5);
+  const invalidStock = parseNativeCommand('add rice price 200 quantity 0','manager');
+  assert.equal(invalidStock.message,'What is the quantity? Say a positive amount.');
+  assert.equal(parseNativeCommand('five','manager',invalidStock.data).data?.quantity,5);
+});
+test('structured product details and delivery remain creation rather than navigation', () => {
+  const result = parseNativeCommand('add product name rice, price 200, stock 10, description fresh rice, category Groceries, delivery yes','manager');
+  assert.equal(result.action,'create_product');
+  assert.equal(result.data?.name,'rice'); assert.equal(result.data?.price,200);
+  assert.equal(result.data?.quantity,10); assert.equal(result.data?.description,'fresh rice');
+  assert.equal(result.data?.deliveryAvailable,true);
 });
 test('native confirmation, cancellation, navigation and digits', () => {
   for (const text of ['yes','हाँ','হ্যাঁ','ஆம்','అవును','होय','હા']) assert.equal(parseNativeCommand(text).action, 'confirm');
@@ -42,6 +77,8 @@ test('every locale has offline assistant and inventory labels', () => {
 test('native searches find catalog terms across languages without a model', () => {
   assert.ok(expandProductSearch('চাল').includes('rice'));
   assert.ok(expandProductSearch('rice').includes('அரிசி'));
+  assert.ok(expandProductSearch('rise').includes('rice'));
+  assert.equal(parseNativeCommand('Please search for Rise in the Marketplace').data?.search,'Rise');
   assert.deepEqual(expandProductSearch('handmade bowl'), ['handmade bowl']);
   assert.equal(detectTextLanguage('চাল'),'bn');
   assert.equal(detectTextLanguage('அரிசி'),'ta');

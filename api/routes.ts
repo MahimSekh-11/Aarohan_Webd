@@ -346,6 +346,30 @@ apiRouter.put('/notifications/:id/read', authMiddleware, async (req: Request, re
 });
 
 // --- Local AI Routes ---
+apiRouter.get('/ai/speech/status', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const { getSpeechStatus, prepareSpeech } = await import('./aiService');
+    if (['idle','error'].includes(getSpeechStatus().state)) void prepareSpeech().catch(error => console.error('Speech preparation failed:',error));
+    res.json(getSpeechStatus());
+  } catch (error) { console.error(error); res.status(503).json({ state:'error' }); }
+});
+
+apiRouter.post('/ai/speak', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { text, language = 'en' } = req.body;
+    const { speechLocales } = await import('../shared/voiceCommands');
+    if (typeof text !== 'string' || !text.trim() || text.length > 1000 || !Object.hasOwn(speechLocales, language)) {
+      res.status(400).json({ message: 'Invalid speech text or language' }); return;
+    }
+    const { synthesizeSpeech } = await import('./speechSynthesis');
+    const audio = await synthesizeSpeech(text, language);
+    res.set({ 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store' }).send(audio);
+  } catch (error) {
+    console.error('Speech synthesis failed:', error);
+    res.status(503).json({ message: 'Could not play spoken reply. Tap replay to try again.' });
+  }
+});
+
 apiRouter.post('/ai/transcribe-and-intent', upload.single('audio'), async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.file) {

@@ -18,7 +18,7 @@ export function encodeWav(samples: Float32Array, sampleRate: number): Blob {
 }
 
 // Capture PCM directly, avoiding browser recording codec/decoder mismatches.
-export async function startPcmRecording(): Promise<{ stop: () => Promise<Blob>; cancel: () => void }> {
+export async function startPcmRecording(onSpeechEnd?: () => void): Promise<{ stop: () => Promise<Blob>; cancel: () => void }> {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
   let context: AudioContext | undefined;
   try {
@@ -28,7 +28,15 @@ export async function startPcmRecording(): Promise<{ stop: () => Promise<Blob>; 
     const processor = context.createScriptProcessor(4096, 1, 1);
     const mute = context.createGain(); mute.gain.value = 0;
     const chunks: Float32Array[] = [];
-    processor.onaudioprocess = event => chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+    let hasSpeech = false; let silence = 0; let signaled = false;
+    processor.onaudioprocess = event => {
+      const samples = new Float32Array(event.inputBuffer.getChannelData(0));
+      chunks.push(samples);
+      const rms = Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
+      if (rms > 0.012) { hasSpeech = true; silence = 0; }
+      else if (hasSpeech) silence += samples.length / context!.sampleRate;
+      if (hasSpeech && silence > 2.5 && !signaled) { signaled = true; onSpeechEnd?.(); }
+    };
     source.connect(processor); processor.connect(mute); mute.connect(context.destination);
     let closed = false;
     const close = () => {

@@ -12,6 +12,9 @@ let transcriberLoading: Promise<any> | null = null;
 let translatorLoading: Promise<any> | null = null;
 let translationQueue: Promise<unknown> = Promise.resolve();
 let transcriptionQueue: Promise<unknown> = Promise.resolve();
+const speechState: { state: 'idle' | 'loading' | 'ready' | 'error' } = { state:'idle' };
+export function getSpeechStatus() { return { ...speechState, model:process.env.WHISPER_MODEL || 'Xenova/whisper-base' }; }
+export async function prepareSpeech() { await loadTranscriber(); }
 
 export const langCodes: Record<string, string> = {
   en: 'eng_Latn', hi: 'hin_Deva', bn: 'ben_Beng', ta: 'tam_Taml',
@@ -24,8 +27,9 @@ const speechLanguages: Record<string, string> = {
 
 async function loadTranscriber() {
   if (transcriber) return transcriber;
+  speechState.state = 'loading';
   transcriberLoading ??= pipeline('automatic-speech-recognition', process.env.WHISPER_MODEL || 'Xenova/whisper-base')
-    .then(model => transcriber = model).catch(error => { transcriberLoading = null; throw error; });
+    .then(model => { speechState.state = 'ready'; return transcriber = model; }).catch(error => { speechState.state = 'error'; transcriberLoading = null; throw error; });
   return transcriberLoading;
 }
 
@@ -68,6 +72,10 @@ export async function transcribeAudio(audioBuffer: Buffer, language = 'en'): Pro
       stride_length_s: 5,
       language: speechLanguages[language],
       task: 'transcribe',
+      max_new_tokens: 256,
+      num_beams: 3,
+      // Repeated product names and number words are meaningful in commands.
+      // Penalizing repetition changes the transcript rather than improving it.
     }));
     transcriptionQueue = run.catch(() => {});
     const result = await run;

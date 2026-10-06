@@ -25,6 +25,8 @@ export const productTerms = [
 ];
 export function expandProductSearch(search: string): string[] {
   const normalized = search.trim().toLocaleLowerCase();
-  const row = productTerms.find(terms => terms.some(term => term === normalized));
+  // Retain the literal query and also search common speech/transliteration forms.
+  const spokenAliases: Record<string,string> = { rise:'rice', राइस:'rice', রাইস:'rice', chawal:'rice', chal:'rice', doodh:'milk', dudh:'milk', aalu:'potato', aloo:'potato' };
+  const row = productTerms.find(terms => terms.some(term => term === (spokenAliases[normalized] || normalized)));
   return [...new Set(row ? [search, ...row] : [search])];
 }
