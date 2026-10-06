@@ -5,6 +5,9 @@ const { WaveFile } = wavefile;
 // Disable local models loading from an absolute path (forces download from HuggingFace to cache)
 env.allowLocalModels = false;
 env.useBrowserCache = false; // We are in node
+if (process.env.VERCEL) {
+  env.cacheDir = '/tmp/.cache';
+}
 
 let transcriber: any = null;
 let translator: any = null;
