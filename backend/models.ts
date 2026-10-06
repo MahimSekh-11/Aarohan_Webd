@@ -14,6 +14,7 @@ const userSchema = new Schema({
 
 userSchema.index({ role: 1 });
 userSchema.index({ status: 1 });
+userSchema.index({role:1,status:1});
 
 export const User = mongoose.model('User', userSchema);
 
@@ -38,6 +39,9 @@ const productSchema = new Schema({
 
 productSchema.index({ managerId: 1 });
 productSchema.index({ category: 1 });
+productSchema.index({managerId:1,createdAt:-1});
+productSchema.index({actualPrice:1,_id:1});
+productSchema.index({createdAt:-1,_id:-1});
 
 export const Product = mongoose.model('Product', productSchema);
 
@@ -71,6 +75,8 @@ leadSchema.index({ activeKey:1 },{unique:true,sparse:true});
 leadSchema.index({ customer: 1 });
 leadSchema.index({ manager: 1 });
 leadSchema.index({ status: 1 });
+leadSchema.index({manager:1,createdAt:-1});
+leadSchema.index({customer:1,createdAt:-1});
 
 export const Lead = mongoose.model('Lead', leadSchema);
 

@@ -13,6 +13,7 @@ function token(user:any){return jwt.sign({id:user._id,role:user.role},process.en
 async function request(path:string,method='GET',body?:any,actor?:any){const response=await fetch(root+path,{method,headers:{'Content-Type':'application/json',...(actor?{Authorization:`Bearer ${token(actor)}`}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:response.status,body:await response.json()};}
 async function say(message:string,actor?:any,extra:any={}){return request('/agent/message','POST',{message,language:'en',history:[],context:{route:'/',title:'Mart',visibleItems:[]},...extra},actor);}
 try{
+  const speechStatus=await request('/ai/speech/status');assert.equal(speechStatus.status,200);assert.equal(speechStatus.body.state,'idle','Observing speech status must not start a model download');
   for(let i=0;i<45;i++)assert.equal((await request('/agent/status')).status,200,'Capability discovery must not consume message quota');
   await Promise.all([User.init(),Product.init(),Lead.init(),AgentAction.init()]);
   const manager=await user('manager','1111111111'),customer=await user('customer','2222222222'),other=await user('manager','3333333333');
@@ -66,5 +67,17 @@ try{
   const selection=await say('এটা অর্ডার করো',customer,{language:'bn',context:{...context,selectedProductId:String(honey._id)}});assert.equal(selection.body.pending.args.id,String(honey._id),'Open dialog wins over older search results');
   await Product.create({name:'honey',description:'Other honey',category:'Groceries',price:150,actualPrice:150,quantity:2,managerId:other._id});
   const ambiguous=await say('order honey',customer);assert.equal(ambiguous.body.pending,undefined);assert.equal(ambiguous.body.items.length,2);
+  const basmati=await Product.create({name:'Basmati rice',description:'Fresh rice',category:'Groceries',price:200,actualPrice:180,offer:10,quantity:6,managerId:manager._id,storeDetails:{storeName:'Green Store',location:'Kolkata'}});
+  const catalog=await say('show rice in Kolkata from Green Store category groceries between 100 and 500',customer);assert.equal(catalog.body.items.length,1);assert.equal(catalog.body.items[0].id,String(basmati._id));
+  const listed=await request(catalog.body.actions[0].path.replace('/marketplace','/products'));assert.deepEqual(listed.body.map((p:any)=>p._id),[String(basmati._id)],'UI and voice must apply identical filters');
+  const metadata=await request('/products/filters');assert.ok(metadata.body.stores.includes('Green Store'));assert.ok(metadata.body.locations.includes('Kolkata'));
+  const details=await say('show details of basmati rice',customer,{language:'bn'});assert.match(details.body.reply,/বাসমতি চাল/);assert.match(details.body.actions[0].path,new RegExp(String(basmati._id)));
+  const translation=await request('/ai/translate','POST',{text:['Basmati rice','Pure honey comb'],sourceLang:'auto',targetLang:'bn',kind:'product_name'});assert.deepEqual(translation.body.translatedText,['বাসমতি চাল','খাঁটি মৌচাক']);assert.equal((await Product.findById(basmati._id))!.name,'Basmati rice');
+  const editContext={...context,selectedProductId:String(basmati._id)};
+  const edit=await say('update this product price to 220 stock 4 category hardware description fresh local rice delivery yes discount 20',manager,{context:editContext});assert.ok(edit.body.pending);assert.equal((await Product.findById(basmati._id))!.price,200);
+  assert.ok((await say('confirm',other,{pending:edit.body.pending.id})).body.error);
+  await say('confirm',manager,{pending:edit.body.pending.id});const edited=await Product.findById(basmati._id);assert.equal(edited!.price,220);assert.equal(edited!.actualPrice,176);assert.equal(edited!.quantity,4);assert.equal(edited!.category,'Hardware');assert.equal(edited!.description,'fresh local rice');assert.equal(edited!.deliveryAvailable,true);
+  assert.ok((await say('update basmati rice stock 8',other)).body.error,'Named updates must stay within the owner account');
+  assert.equal((await request('/products?minPrice=500&maxPrice=100')).status,400);assert.equal((await request('/products?storeName[$ne]=x')).status,400);
   console.log('Agent integration passed: real isolated database; role/ownership validation; create/search/profile; native replies; expiring one-use confirmations; idempotent stock resolution; malformed inputs.');
 }finally{await new Promise<void>(r=>server.close(()=>r()));await mongoose.disconnect();await mongo.stop();}

@@ -24,6 +24,10 @@ The model chooses a structured plan. The server validates all calls before runni
 
 ## Voice behavior
 
+Open **Voice command help** using the question-mark button in the header or assistant, or say `open help`. The `/help` page groups commands for everyone, customers, approved store managers and administrators. Each example explains its result and whether confirmation is needed. **Use example** fills the assistant input without executing an action. Native examples, permissions and troubleshooting are bundled in all seven site languages. Administrators use dashboard buttons to manage accounts; voice opens their dashboard.
+
+Navigation commands execute locally through the existing protected routes, without waiting for the agent API. Common navigation/control plans also bypass cloud reasoning on the server. Hovering or focusing header links preloads route code. Product details reuse visible catalog data instead of reloading all products; refreshing filters keeps cards visible with a loading status. Dashboard counts run in parallel, repeated profile reads are removed, and compound indexes support inventory, inquiry and price sorting. Speech status only reports readiness: opening a panel no longer downloads Whisper or imports its heavy runtime. The first actual server transcription still prepares the model and can take longer. These changes remove avoidable waits; actual database/network/cloud inference latency remains dependent on hosting.
+
 Start voice explicitly with the floating microphone or the panel microphone. Native browser recognition uses the selected locale and a parallel PCM recording provides fallback if browser recognition fails. Automatic language mode uses server transcription and retains the detected language. No account is required to browse/search or use public page controls; product creation requires an approved store-manager session.
 
 The panel shows ready, listening, processing, speaking and error states, a live transcript, typed input, mute, replay, stop, language, clear conversation and memory controls. If a product is incomplete or a buying request needs confirmation, the agent asks and resumes listening after speaking during the explicitly started voice session. The stop microphone control ends that session. Complete product commands may save automatically; disable automatic save to review, and low-confidence browser recognition also requires review. Name, price and quantity (whole stock units) remain editable before confirmation.
@@ -44,18 +48,18 @@ Speech capture is capped at 30 seconds. PCM WAV avoids browser codec mismatches.
 | Recognition | Native browser locales where available; multilingual Whisper locally; Gemini when configured |
 | Broad natural language reasoning / additional-language replies | Gemini when configured; local parser provides supported core commands rather than unrestricted conversation |
 
-UI labels switch immediately from bundled dictionaries. Proper names/store brands are preserved. Common product vocabulary is bundled; unfamiliar descriptions/reviews require dynamic server translation. Gemini performs dynamic translation when a key exists, otherwise local NLLB is used. Kannada, Malayalam, Punjabi and Urdu are assistant choices; the full site UI stays within the seven bundled UI locales. Local script detection is heuristic and ambiguous shared scripts/code switching may need an explicit selection. Gemini transcription provides an additional detected-language result. Installed system voices vary by browser/device; eSpeak fallback is audible but synthetic.
+UI labels switch immediately from bundled dictionaries. Product names use translated display values on marketplace cards, detail dialogs, inventory and buying inquiries. Common composite names such as Basmati rice translate immediately across the seven site languages; unfamiliar names use server translation, with bounded retries and a partial-vocabulary fallback. Proper brand names and stored product names/IDs are preserved. Spoken translated names resolve back to the original listing. Unfamiliar descriptions/reviews also require dynamic server translation. Gemini performs dynamic translation when a key exists, otherwise local NLLB is used. Kannada, Malayalam, Punjabi and Urdu are assistant choices; the full site UI stays within the seven bundled UI locales. Local script detection is heuristic and ambiguous shared scripts/code switching may need an explicit selection. Gemini transcription provides an additional detected-language result. Installed system voices vary by browser/device; eSpeak fallback is audible but synthetic.
 
 ## Registered capabilities
 
 | Tool | Result and permissions |
 |---|---|
 | navigate | Allowlisted internal pages; protected destinations enforce role |
-| search_products | Database-backed product search, category, delivery, budget and discounted-price sort |
-| get_product | Real product details and detail dialog |
+| search_products | Database-backed product search, location, store name, category, minimum/maximum actual price, delivery and sort; filters can be combined or cleared |
+| get_product | Real product details and detail dialog, by selected listing, reference or unique name |
 | get_requests | Current customer's inquiries or manager's owned inquiries |
 | create_product | Approved manager only; missing fields become a draft; optional review/low-confidence review |
-| update_product | Owned inventory, validated fields, explicit confirmation |
+| update_product | Owned inventory by reference or unique name; name, price, stock, category, description, delivery and discount; validated fields and explicit confirmation |
 | delete_product | Owned inventory and explicit confirmation |
 | request_product | Customer buying inquiry, stock check and confirmation; duplicate active requests are suppressed |
 | update_request | Manager-owned inquiry; confirmation; completion atomically changes stock and status |
@@ -66,6 +70,10 @@ UI labels switch immediately from bundled dictionaries. Proper names/store brand
 Examples:
 
 - `Show me the cheapest products under 500 rupees.`
+- `Find rice in Kolkata from Green Store category groceries between 100 and 500.`
+- `Only show products with delivery.` / `Clear all filters.`
+- `Show this product details.` / `Show Basmati rice details.`
+- `Go to inventory.` / `Open the add product page.` / `Go to the home page.`
 - `Find a laptop under fifty thousand.`
 - `Show the cheapest one.` / `Open the second one.` after a search
 - `চাল খুঁজুন` / `चावल खोजो`
@@ -75,9 +83,12 @@ Examples:
 - Customer with an open product: `order this item`, then `yes please` / `এটা অর্ডার করো`, then `হ্যাঁ করুন`
 - Customer: `order honey` (choose a listing if more than one store offers it)
 - Manager: `add item rice price 200 quantity 5`
+- Manager: `Update this product price to 220 stock 4 category hardware description fresh local rice delivery yes discount 20`, then review the proposed fields and say `confirm`
 - Manager: `show my requests`, then `Complete the first request`, then `confirm`
 - `Change my name to New Name`, then `confirm`
 - `Remember that I prefer Bengali.` / `Forget that I prefer Bengali.`
+
+Voice and manual marketplace controls share the same server filter implementation and URL state. Location and store name match literal stored text case-insensitively; they are not distance/geocoding filters. Category aliases normalize to existing categories, while custom category names remain supported. Existing constraints survive a follow-up command until cleared. Updates use the selected product before older conversation references, show the exact proposed fields and freeze the product ID for confirmation. Names mentioned inside a new description do not change the update target.
 
 Search does not fabricate catalog items. A laptop request legitimately returns zero results if no store lists laptops. Reviews and administrator approval remain available through their existing UI; the agent can navigate to those pages but does not have arbitrary form submission or administrator account deletion tools. Unsupported best-rating sorts, carts/payments, external shopping and flights are not synthesized into fake APIs.
 
@@ -173,6 +184,7 @@ Created:
 - `shared/agent.ts`, `shared/agentLanguages.ts`, `shared/memoryCommands.ts`
 - `backend/agent/providers.ts`, `backend/agent/router.ts`, `backend/agent/speech.ts`, `backend/agent/tools.ts`
 - `backend/validation.ts`, `backend/requestService.ts`
+- `backend/catalog.ts`, `shared/catalogCommands.ts`, `shared/productNames.ts`, `shared/productVocabulary.ts`
 - `src/agent/context.ts`, `src/agent/memory.ts`, `src/agent/useVoiceInput.ts`, `src/agent/useVoiceOutput.ts`
 - `src/lib/useDialog.ts`, `src/pages/Account.tsx`
 - `scripts/create-admin.ts`, `scripts/clean.mjs`

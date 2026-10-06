@@ -10,11 +10,12 @@ export class ServerTextToSpeechProvider implements TextToSpeechProvider {
     return response.arrayBuffer();
   }
 }
+let voicesLoading:Promise<SpeechSynthesisVoice[]>;
 async function loadVoices():Promise<SpeechSynthesisVoice[]>{
   const synth=window.speechSynthesis;
   if(!synth)return [];
   if(synth.getVoices().length)return synth.getVoices();
-  return new Promise(resolve=>{
+  return voicesLoading ??= new Promise(resolve=>{
     const finish=()=>{clearTimeout(timer);synth.removeEventListener?.('voiceschanged',finish);resolve(synth.getVoices());};
     const timer=setTimeout(finish,400);synth.addEventListener?.('voiceschanged',finish,{once:true});
   });

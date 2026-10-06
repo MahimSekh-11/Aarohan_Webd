@@ -9,6 +9,7 @@ import { executeTool } from './tools.js';
 import { productComplete } from '../../shared/productVoice.js';
 import { naturalSpeechConfigured } from '../speechSynthesis.js';
 import { isVoiceConfirmation } from '../../shared/voiceCommands.js';
+import { translateKnownProductName } from '../../shared/productNames.js';
 
 export const agentRouter=Router();
 const rates=new Map<string,{count:number;until:number}>();
@@ -31,12 +32,13 @@ agentRouter.post('/message', async (req:Request,res:Response) => {
     if(typeof body.message !== 'string' || !body.message.trim() || body.message.length>1500 || !Object.hasOwn(agentLanguages,body.language || 'auto')) {res.status(400).json({message:'Invalid message or language'});return;}
     language=body.language === 'auto' || !body.language ? detectAgentLanguage(body.message) : body.language;
     const context=body.context || {};
-    const items=(value:any) => Array.isArray(value) ? value.slice(0,20).filter((item:any) => typeof item?.id==='string' && /^[a-f0-9]{24}$/i.test(item.id) && typeof item.name==='string').map((item:any) => ({id:item.id,name:item.name.slice(0,150),...(['product','request'].includes(item.kind)?{kind:item.kind}:{}),...(typeof item.price==='number' ? {price:item.price} : {})})) : [];
+    const items=(value:any) => Array.isArray(value) ? value.slice(0,20).filter((item:any) => typeof item?.id==='string' && /^[a-f0-9]{24}$/i.test(item.id) && typeof item.name==='string').map((item:any) => ({id:item.id,name:item.name.slice(0,150),...(typeof item.displayName === 'string' ? {displayName:item.displayName.slice(0,150)} : {}),...(['product','request'].includes(item.kind)?{kind:item.kind}:{}),...(typeof item.price==='number' ? {price:item.price} : {})})) : [];
     const history=Array.isArray(body.history) ? body.history.slice(-10).filter((m:any) => ['user','assistant'].includes(m?.role) && typeof m.text==='string').map((m:any) => ({role:m.role,text:m.text.slice(0,1000)})) : [];
     const input:AgentRequest={message:body.message.trim(),language,history,preferences:{...(typeof body.preferences?.budget==='number' && Number.isFinite(body.preferences.budget) && body.preferences.budget>0 && body.preferences.budget<=1000000?{budget:body.preferences.budget}:{}),...(typeof body.preferences?.category==='string' && ['Groceries','Handicrafts','Electronics','Clothing','Hardware'].includes(body.preferences.category)?{category:body.preferences.category}:{})},context:{route:typeof context.route==='string' ? context.route.slice(0,200) : '/',title:typeof context.title==='string' ? context.title.slice(0,100) : '',selectedProductId:typeof context.selectedProductId === 'string' && /^[a-f0-9]{24}$/i.test(context.selectedProductId) ? context.selectedProductId : undefined,visibleItems:items(context.visibleItems),recentItems:items(context.recentItems),search:context.search && typeof context.search==='object' ? context.search : {},draft:context.draft && typeof context.draft==='object' ? context.draft : undefined}};
     if(JSON.stringify(input).length>20000){res.status(400).json({message:'Conversation context is too large'});return;}
     let provider=getLLMProvider();
     const result:AgentResult={reply:'',language,actions:[],provider:provider.name};
+    let replyLocalized=false;
     if(body.pending && isVoiceConfirmation(input.message)) {
       if(!req.user)throw new Error('Please log in to use this action.');
       const pending=await AgentAction.findOneAndUpdate({_id:String(body.pending),userId:req.user._id,consumed:false,expiresAt:{$gt:new Date()}},{$set:{consumed:true}},{returnDocument:'after'});
@@ -46,7 +48,11 @@ agentRouter.post('/message', async (req:Request,res:Response) => {
       result.reply=output.message; result.actions=output.actions || [];
     } else {
       let plan;
-      try {plan=await provider.plan(input,req.user?.role);}
+      try {
+        const quick=await new LocalLLMProvider().plan(input,req.user?.role);
+        if(quick.calls.length===1&&['navigate','get_profile','website_control'].includes(quick.calls[0].name)){plan=quick;result.provider='local';}
+        else plan=provider.name==='local'?quick:await provider.plan(input,req.user?.role);
+      }
       catch {provider=new LocalLLMProvider();result.provider='local';plan=await provider.plan(input,req.user?.role);}
       if(!plan.calls.length){
         // A model-only answer cannot assert that a database action succeeded.
@@ -63,9 +69,14 @@ agentRouter.post('/message', async (req:Request,res:Response) => {
           result.draft={quantity:1,...call.args}; result.reply='Review this product, then confirm to save it.'; break;
         }
         const output=await executeTool(call,{user:req.user,language});
+        replyLocalized=false;
         result.reply=output.message;
-        if(output.result?.count !== undefined)result.reply=`${await localizeReply(output.message,language)}: ${output.result.count}.`;
-        if(output.result?.name && ['get_product','request_product'].includes(call.name))result.reply=`${await localizeReply(output.message,language)}: ${output.result.name}, ₹${output.result.price}.`;
+        if(output.result?.count !== undefined){result.reply=`${await localizeReply(output.message,language)}: ${output.result.count}.`;replyLocalized=true;}
+        if(output.result?.name && ['get_product','request_product','update_product'].includes(call.name)){
+          const name=translateKnownProductName(output.result.name,agentLanguages[language].base).text;
+          result.reply=`${await localizeReply(output.message,language)}: ${name}${call.name==='update_product'?'':`, ₹${output.result.price}`}.`;
+          replyLocalized=true;
+        }
         result.actions.push(...output.actions || []);
         if(output.items)result.items=output.items;
         if(output.draft)result.draft=output.draft;
@@ -76,7 +87,7 @@ agentRouter.post('/message', async (req:Request,res:Response) => {
         }
       }
     }
-    result.reply=await localizeReply(result.reply,language).catch(() => result.reply);
+    if(!replyLocalized)result.reply=await localizeReply(result.reply,language).catch(() => result.reply);
     if(process.env.NODE_ENV !== 'production')console.info('Agent request',{requestId,language,provider:result.provider,actions:result.actions.map(a => a.type),latencyMs:Date.now()-started});
     res.json({...result,requestId});
   } catch(error) {

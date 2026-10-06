@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Search, Filter, MapPin, Phone, Truck, Package, Store, Star, MessageSquare, X, ChevronLeft, ChevronRight, AlertCircle, CheckCircle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useT } from '../components/Translate';
+import { useT, useProductName } from '../components/Translate';
 
 import { useDialog } from '../lib/useDialog';
 
@@ -17,7 +17,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
   const [cardImageIdx, setCardImageIdx] = useState(0);
   const [modalImageIdx, setModalImageIdx] = useState(0);
   const { user, token } = useAuthStore();
-  const t = useT();
+  const t = useT(),pn=useProductName();
   const dialog=useRef<HTMLDivElement>(null);
   const [params]=useSearchParams();
   const [cardError,setCardError]=useState('');
@@ -97,14 +97,14 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
 
   return (
     <>
-      <div data-product-id={p._id} data-product-name={p.name} data-product-price={p.actualPrice ?? p.price} role="button" tabIndex={0} aria-label={t(p.name)} onKeyDown={e=>{if(e.target===e.currentTarget && ['Enter',' '].includes(e.key)){e.preventDefault();setShowModal(true);}}}
+      <div data-product-id={p._id} data-product-name={p.name} data-product-display-name={pn(p.name)} data-product-price={p.actualPrice ?? p.price} role="button" tabIndex={0} aria-label={pn(p.name)} onKeyDown={e=>{if(e.target===e.currentTarget && ['Enter',' '].includes(e.key)){e.preventDefault();setShowModal(true);}}}
         onClick={() => { setShowModal(true); setModalImageIdx(0); }}
         className="cyber-glow-card group relative bg-[#162638] border border-[#2B4054] rounded-2xl overflow-hidden shadow-lg transition-all duration-300 flex flex-col cursor-pointer transform-gpu will-change-transform"
       >
         {/* Visual Layer */}
         <div className="relative w-full aspect-[4/3] bg-[#102030] overflow-hidden">
           {hasImages ? (
-            <img src={images[cardImageIdx]} alt={t(p.name)} className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-500 transform-gpu" />
+            <img src={images[cardImageIdx]} alt={pn(p.name)} className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-500 transform-gpu" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Package className="w-12 h-12 text-[#7B95AD]" />
@@ -139,7 +139,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
         {/* Content Layer */}
         <div className="p-5 flex-1 flex flex-col relative bg-[#162638]">
           <p className="text-[10px] font-black uppercase text-[#83D9BD] tracking-widest mb-1.5 font-sans">{t(p.category || '')}</p>
-          <h3 className="text-base font-bold text-[#F3F6F9] tracking-tight leading-snug break-words mb-3 line-clamp-2">{t(p.name)}</h3>
+          <h3 className="text-base font-bold text-[#F3F6F9] tracking-tight leading-snug break-words mb-3 line-clamp-2">{pn(p.name)}</h3>
 
           {/* Stock Indicator */}
           {outOfStock ? (
@@ -179,7 +179,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
       {/* Full-Page Detailed View Modal */}
       {cardError && <p className="error-banner" role="alert">{t(cardError)}</p>}
       {showModal && (
-        <div ref={dialog} data-selected-product-id={p._id} role="dialog" aria-modal="true" aria-label={t(p.name)} className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 md:p-8 xl:p-12 overflow-hidden bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+        <div ref={dialog} data-selected-product-id={p._id} role="dialog" aria-modal="true" aria-label={pn(p.name)} className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 md:p-8 xl:p-12 overflow-hidden bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-[#162638] border border-[#2B4054] w-full max-w-6xl h-[92vh] md:h-[85vh] rounded-2xl md:rounded-[32px] shadow-2xl overflow-hidden flex flex-col md:flex-row relative">
 
             {/* Close Button */}
@@ -195,7 +195,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
               {hasImages ? (
                 <>
                   <div className="flex-1 w-full relative min-h-0 bg-[#0D1825] flex items-center justify-center p-3">
-                    <img src={images[modalImageIdx]} alt={t(p.name)} className="max-w-full max-h-full object-contain" />
+                    <img src={images[modalImageIdx]} alt={pn(p.name)} className="max-w-full max-h-full object-contain" />
                     {p.offer > 0 && (
                       <div className="absolute top-6 left-6 bg-[#E6B879] text-white text-xs font-black uppercase tracking-wider px-3.5 py-1.5 rounded-lg shadow-lg z-10 animate-cyber-pulse border border-[#F1C998]/30 shadow-[0_0_15px_rgba(139,92,246,0.4)]">
                         {p.offer}{t("% OFF")}</div>
@@ -228,7 +228,7 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
             <div className="w-full md:w-[55%] flex-1 flex flex-col bg-[#162638] overflow-y-auto">
               <div className="p-6 md:p-10 flex-1">
                 <p className="text-[10px] font-black uppercase text-[#83D9BD] tracking-widest mb-2 font-sans">{t(p.category || '')}</p>
-                <h2 className="text-2xl md:text-3xl font-black text-[#F3F6F9] leading-tight mb-6">{t(p.name)}</h2>
+                <h2 className="text-2xl md:text-3xl font-black text-[#F3F6F9] leading-tight mb-6">{pn(p.name)}</h2>
 
                 <div className="flex items-center gap-4 mb-8 bg-[#0D1825] inline-flex px-5 py-3 rounded-2xl border border-[#2B4054] shadow-inner">
                   <div className="flex flex-col">
@@ -373,31 +373,44 @@ const ProductCard = ({ p, onInterest }: { key?: React.Key, p: any, onInterest: (
 
 export default function Marketplace() {
   const [params,setParams]=useSearchParams();
-  const [products,setProducts]=useState<any[]>([]),[search,setSearch]=useState(params.get('search')||''),[selectedStore,setSelectedStore]=useState(''),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0);
+  const [products,setProducts]=useState<any[]>([]),[search,setSearch]=useState(params.get('search')||''),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0);
+  const [options,setOptions]=useState<{stores:string[];locations:string[];categories:string[]}>({stores:[],locations:[],categories:[]});
   const {user,token}=useAuthStore(),navigate=useNavigate(),t=useT();
-  const category=params.get('category')||'',deliveryOnly=params.get('delivery')==='true',maxPrice=params.get('maxPrice')||'',sort=params.get('sort')||'newest';
+  const category=params.get('category')||'',deliveryOnly=(params.get('deliveryAvailable') ?? params.get('delivery'))==='true',maxPrice=params.get('maxPrice')||'',minPrice=params.get('minPrice')||'',storeName=params.get('storeName')||'',location=params.get('location')||'',sort=params.get('sort')||'newest';
+  const catalogParams=new URLSearchParams(params);catalogParams.delete('product');const catalogQuery=catalogParams.toString();
+  const selectedProduct=params.get('product');
   useEffect(()=>{setSearch(params.get('search')||'');},[params]);
   const setFilter=(key:string,value:string)=>{const next=new URLSearchParams(params);if(value)next.set(key,value);else next.delete(key);next.delete('product');setParams(next,{replace:true});};
   useEffect(()=>{const timer=setTimeout(()=>{if(search!==(params.get('search')||''))setFilter('search',search);},250);return()=>clearTimeout(timer);},[search]);
   useEffect(()=>{const refresh=()=>setRevision(n=>n+1);window.addEventListener('products-updated',refresh);return()=>window.removeEventListener('products-updated',refresh);},[]);
+  useEffect(()=>{const abort=new AbortController();void fetch('/api/products/filters',{signal:abort.signal}).then(r=>r.ok?r.json():null).then(data=>{if(data && ['stores','locations','categories'].every(key=>Array.isArray(data[key])))setOptions(data);}).catch(()=>{});return()=>abort.abort();},[revision]);
   useEffect(()=>{
     const controller=new AbortController();setLoading(true);setError('');
-    const query=new URLSearchParams(params);if(deliveryOnly)query.set('deliveryAvailable','true');
+    const query=new URLSearchParams(catalogQuery);if(deliveryOnly)query.set('deliveryAvailable','true');
     async function load(){try{const res=await fetch(`/api/products?${query}`,{signal:controller.signal});if(!res.ok)throw new Error();const data=await res.json();if(!Array.isArray(data))throw new Error();
-      const id=params.get('product');if(id&&!data.some(p=>p._id===id)){const detail=await fetch(`/api/products/${id}`,{signal:controller.signal});if(detail.ok)data.unshift(await detail.json());}
       if(!controller.signal.aborted)setProducts(data);
     }catch(e){if(!controller.signal.aborted)setError('Could not load products. Please try again.');}finally{if(!controller.signal.aborted)setLoading(false);}}
     void load();return()=>controller.abort();
-  },[params,revision]);
-  const stores=[...new Set(products.map(p=>p.storeDetails?.storeName).filter(Boolean))] as string[];
-  const filtered=products.filter(p=>!selectedStore||p.storeDetails?.storeName===selectedStore);
+  },[catalogQuery,revision]);
+  useEffect(()=>{if(!selectedProduct || loading || products.some(p=>p._id===selectedProduct))return;const abort=new AbortController();void fetch(`/api/products/${selectedProduct}`,{signal:abort.signal}).then(r=>r.ok?r.json():null).then(p=>{if(p&&!abort.signal.aborted)setProducts(items=>items.some(item=>item._id===p._id)?items:[p,...items]);}).catch(()=>{});return()=>abort.abort();},[selectedProduct,loading,products]);
+  const categories=[...new Set(['Groceries','Handicrafts','Electronics','Clothing','Hardware',...options.categories,category].filter(Boolean))];
+  const filtered=products;
   return <section className="space-y-7 py-8"><div className="flex flex-wrap justify-between items-end gap-4"><div><p className="section-kicker">{t('Browse & Selection')}</p><h1 className="page-title mt-3">{t('Marketplace')}</h1></div><button className="button-secondary" onClick={()=>window.dispatchEvent(new Event('agent-open'))}>{t('Voice Assistant')}</button></div>
     <div className="surface-panel p-5 space-y-4"><div className="relative"><Search className="absolute left-4 top-3.5 text-[#A5B7C8]" size={19}/><input aria-label={t('Search products...')} placeholder={t('Search products...')} className="w-full bg-[#0D1825] border border-[#2B4054] rounded-xl pl-12 pr-4 py-3" value={search} onChange={e=>setSearch(e.target.value)} maxLength={150}/></div>
-      <div className="market-filters"><select aria-label={t('Category')} value={category} onChange={e=>setFilter('category',e.target.value)}><option value="">{t('All Categories')}</option>{['Groceries','Handicrafts','Electronics','Clothing','Hardware'].map(c=><option value={c} key={c}>{t(c)}</option>)}</select><select aria-label={t('Store')} value={selectedStore} onChange={e=>setSelectedStore(e.target.value)}><option value="">{t('All Locations')}</option>{stores.map(name=><option key={name}>{name}</option>)}</select><input aria-label={t('Maximum price')} placeholder={t('Maximum price')} type="number" min="0" value={maxPrice} onChange={e=>setFilter('maxPrice',e.target.value)}/><select aria-label={t('Sort products')} value={sort} onChange={e=>setFilter('sort',e.target.value)}><option value="newest">{t('Newest first')}</option><option value="price_asc">{t('Price: low to high')}</option><option value="price_desc">{t('Price: high to low')}</option></select><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={deliveryOnly} onChange={e=>setFilter('delivery',e.target.checked?'true':'')}/>{t('Delivery Available')}</label><button className="button-secondary" onClick={()=>{setSearch('');setSelectedStore('');setParams({});}}>{t('Clear filters')}</button></div>
+      <div className="market-filters">
+        <select aria-label={t('Category')} value={category} onChange={e=>setFilter('category',e.target.value)}><option value="">{t('All Categories')}</option>{categories.map(c=><option value={c} key={c}>{t(c)}</option>)}</select>
+        <input aria-label={t('Store')} placeholder={t('All Stores')} list="catalog-stores" value={storeName} maxLength={150} onChange={e=>setFilter('storeName',e.target.value)}/><datalist id="catalog-stores">{options.stores.map(name=><option key={name} value={name}/>)}</datalist>
+        <input aria-label={t('Location')} placeholder={t('All Locations')} list="catalog-locations" value={location} maxLength={150} onChange={e=>setFilter('location',e.target.value)}/><datalist id="catalog-locations">{options.locations.map(name=><option key={name} value={name}/>)}</datalist>
+        <input aria-label={t('Minimum price')} placeholder={t('Minimum price')} type="number" min="0" step="0.01" value={minPrice} onChange={e=>setFilter('minPrice',e.target.value)}/>
+        <input aria-label={t('Maximum price')} placeholder={t('Maximum price')} type="number" min="0" step="0.01" value={maxPrice} onChange={e=>setFilter('maxPrice',e.target.value)}/>
+        <select aria-label={t('Sort products')} value={sort} onChange={e=>setFilter('sort',e.target.value)}><option value="newest">{t('Newest first')}</option><option value="price_asc">{t('Price: low to high')}</option><option value="price_desc">{t('Price: high to low')}</option></select>
+        <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={deliveryOnly} onChange={e=>{const next=new URLSearchParams(params);next.delete('delivery');next.delete('product');if(e.target.checked)next.set('deliveryAvailable','true');else next.delete('deliveryAvailable');setParams(next,{replace:true});}}/>{t('Delivery Available')}</label><button className="button-secondary" onClick={()=>{setSearch('');setParams({});}}>{t('Clear filters')}</button>
+      </div>
     </div>
     {error&&<div role="alert" className="error-banner">{t(error)}<button className="button-secondary ml-3" onClick={()=>setRevision(n=>n+1)}>{t('Try again')}</button></div>}
     {!loading&&!error&&<p className="page-subtitle" role="status">{t('Products found')}: {filtered.length}</p>}
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">{loading?Array.from({length:4},(_,i)=><div key={i} className="card-skeleton"/>):!error&&filtered.map(p=><ProductCard key={p._id} p={p} onInterest={async id=>{if(!user){navigate('/login');return false;}try{const res=await fetch('/api/leads',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({productId:id})});if(res.ok)window.dispatchEvent(new Event('requests-updated'));return res.ok;}catch{return false;}}}/>)}</div>
-    {!loading&&!error&&filtered.length===0&&<div className="empty-state"><Package size={35}/><p>{t('No products found.')}</p><button className="button-secondary" onClick={()=>{setSearch('');setSelectedStore('');setParams({});}}>{t('Clear filters')}</button></div>}
+    {loading&&products.length>0&&<p role="status" className="page-subtitle">{t('Loading...')}</p>}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">{loading&&products.length===0?Array.from({length:4},(_,i)=><div key={i} className="card-skeleton"/>):!error&&filtered.map(p=><ProductCard key={p._id} p={p} onInterest={async id=>{if(!user){navigate('/login');return false;}try{const res=await fetch('/api/leads',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({productId:id})});if(res.ok)window.dispatchEvent(new Event('requests-updated'));return res.ok;}catch{return false;}}}/>)}</div>
+    {!loading&&!error&&filtered.length===0&&<div className="empty-state"><Package size={35}/><p>{t('No products found.')}</p><button className="button-secondary" onClick={()=>{setSearch('');setParams({});}}>{t('Clear filters')}</button></div>}
   </section>;
 }

@@ -5,6 +5,7 @@ import { type ToolCall, type AgentResult } from '../../shared/agent.js';
 import { productComplete } from '../../shared/productVoice.js';
 import { updateRequestStatus } from '../requestService.js';
 import { productFields, profileFields, productSnapshot } from '../validation.js';
+import { catalogFilter, catalogSort } from '../catalog.js';
 
 export type ToolEnvironment = { user?:any; language:string };
 export type ToolOutput = { message:string; result?:any; actions?:AgentResult['actions']; items?:any[]; draft?:Record<string,any>; search?:Record<string,unknown>; needsConfirmation?:boolean; confirmationArgs?:Record<string,unknown> };
@@ -15,6 +16,13 @@ const checkRole = (user:any, roles:string[]) => {
 };
 const requireDatabase = () => { if (mongoose.connection.readyState !== 1) throw new Error('The website data service is unavailable. Please try again.'); };
 const cleanProduct = (p:any) => ({ id:String(p._id),kind:'product', name:p.name, price:p.actualPrice ?? p.price, category:p.category, description:p.description, quantity:p.quantity, deliveryAvailable:p.deliveryAvailable, store:p.storeDetails?.storeName });
+async function findNamedProducts(search:string,managerId?:unknown){
+  const filter=await catalogFilter({search});if(managerId){filter.managerId=managerId;delete filter.quantity;}
+  return Product.find(filter).sort(catalogSort('newest')).limit(21);
+}
+function chooseProduct(items:any[],search:string,manager=false):ToolOutput{
+  return {message:'Please select a product first.',items:items.slice(0,20).map(cleanProduct),search:{search},actions:[{type:'navigate',path:manager?'/manager':`/marketplace?search=${encodeURIComponent(search)}`}]};
+}
 
 export async function executeTool(call:ToolCall, env:ToolEnvironment, confirmed=false):Promise<ToolOutput> {
   const a=call.args; const user=env.user;
@@ -30,24 +38,18 @@ export async function executeTool(call:ToolCall, env:ToolEnvironment, confirmed=
     website_control:async () => ({message:'Updating this page',actions:[{type:'website_control',command:String(a.command)}]}),
     search_products:async () => {
       requireDatabase();
-      const activeManagers=await User.find({role:'manager',status:'approved'}).distinct('_id');
-      const filter:any={quantity:{$gt:0},managerId:{$in:activeManagers}};
-      if (a.search) filter.name={$regex:expandProductSearch(String(a.search)).map(term => term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),$options:'i'};
-      if (a.category) filter.category=String(a.category);
-      if (a.deliveryAvailable === true) filter.deliveryAvailable=true;
-      if (a.minPrice !== undefined || a.maxPrice !== undefined) {
-        filter.actualPrice={}; if (a.minPrice !== undefined) filter.actualPrice.$gte=a.minPrice; if (a.maxPrice !== undefined) filter.actualPrice.$lte=a.maxPrice;
-      }
-      const sort:any=a.sort === 'price_asc' ? {actualPrice:1,_id:1} : a.sort === 'price_desc' ? {actualPrice:-1,_id:1} : {createdAt:-1};
+      const filter=await catalogFilter(a),sort=catalogSort(a.sort);
       const limit=Math.min(Math.max(Number(a.limit) || 20,1),50);
       const [products,count]=await Promise.all([Product.find(filter).sort(sort).limit(limit).lean(),Product.countDocuments(filter)]);
       const query=new URLSearchParams();
-      for (const key of ['search','category','minPrice','maxPrice','sort']) if (a[key] !== undefined) query.set(key,String(a[key]));
-      if (a.deliveryAvailable) query.set('delivery','true');
+      for (const key of ['search','category','location','storeName','minPrice','maxPrice','sort']) if (a[key] !== undefined) query.set(key,String(a[key]));
+      if (a.deliveryAvailable!==undefined) query.set('deliveryAvailable',String(a.deliveryAvailable));
       return {message:'Products found',result:{count},items:products.map(cleanProduct),search:a,actions:[{type:'navigate',path:`/marketplace?${query}`}]};
     },
     get_product:async () => {
-      requireDatabase(); const p=await Product.findById(a.id).lean(); if (!p || !await User.exists({_id:p.managerId,role:'manager',status:'approved'})) throw new Error('Product not found.');
+      requireDatabase();let p;
+      if(a.search){const products=await findNamedProducts(String(a.search));if(products.length>1)return chooseProduct(products,String(a.search));p=products[0];}else p=await Product.findById(a.id).lean();
+      if (!p || !await User.exists({_id:p.managerId,role:'manager',status:'approved'})) throw new Error('Product not found.');
       return {message:'Product details',result:cleanProduct(p),items:[cleanProduct(p)],actions:[{type:'navigate',path:`/marketplace?product=${p._id}`}]};
     },
     get_requests:async () => {
@@ -69,14 +71,16 @@ export async function executeTool(call:ToolCall, env:ToolEnvironment, confirmed=
     },
     update_product:async () => {
       checkRole(user,['manager']); requireDatabase();
-      const {id,...changes}=a;
+      const {id,search,...changes}=a;
       if (changes.price !== undefined && Number(changes.price)<=0) throw new Error('Please provide a positive price.');
-      const owned=await Product.findOne({_id:id,managerId:user._id});if(!owned)throw new Error('Product not found or unauthorized.');
+      let owned;
+      if(search){const products=await findNamedProducts(String(search),user._id);if(products.length>1)return chooseProduct(products,String(search),true);owned=products[0];}else owned=await Product.findOne({_id:id,managerId:user._id});
+      if(!owned)throw new Error('Product not found or unauthorized.');
       const fields=productFields(changes,true);
       if(!Object.keys(fields).length)throw new Error('Please provide product details to update.');
-      if(!confirmed)return {message:'Update this product? Please confirm.',needsConfirmation:true};
-      if (fields.price !== undefined) fields.actualPrice=Math.round(fields.price*(1-(owned.offer || 0)/100)*100)/100;
-      const result=await Product.findOneAndUpdate({_id:id,managerId:user._id},{$set:fields},{returnDocument:'after',runValidators:true});
+      if(!confirmed)return {message:'Update this product? Please confirm.',result:cleanProduct(owned),needsConfirmation:true,confirmationArgs:{id:String(owned._id),...changes}};
+      if (fields.price !== undefined || fields.offer !== undefined) fields.actualPrice=Math.round((fields.price ?? owned.price)*(1-(fields.offer ?? owned.offer ?? 0)/100)*100)/100;
+      const result=await Product.findOneAndUpdate({_id:owned._id,managerId:user._id},{$set:fields},{returnDocument:'after',runValidators:true});
       if (!result) throw new Error('Product not found or unauthorized.');
       return {message:'Product updated successfully.',result:cleanProduct(result),actions:[{type:'refresh'}]};
     },

@@ -19,3 +19,7 @@ export function useT() {
 
 // Keep old name for compatibility
 export const useTranslate = useT;
+export function useProductName(){
+  useLanguageStore(state=>state.currentLang);useLanguageStore(state=>state.revision);
+  return useLanguageStore(state=>state.productName);
+}

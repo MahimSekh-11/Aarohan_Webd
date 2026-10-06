@@ -2,6 +2,8 @@ import React, { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import Navbar from './components/Navbar';
+import {pages,prefetchPage} from './lib/pages';
+const Help=lazy(pages['/help']);
 const Marketplace=lazy(()=>import('./pages/Marketplace'));
 const Login=lazy(()=>import('./pages/Login'));
 const AdminLogin=lazy(()=>import('./pages/AdminLogin'));
@@ -29,6 +31,7 @@ function PageRoutes(){
   const location=useLocation(),t=useT(),language=useLanguageStore(s=>s.currentLang);
   useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});document.title=`TIORKHALI MART · ${t(location.pathname==='/marketplace'?'Marketplace':location.pathname==='/account'?'Account':location.pathname==='/manager'?'Dashboard':location.pathname==='/admin'?'Admin':location.pathname==='/customer'?'My Requests':location.pathname==='/register'?'Create Account':location.pathname.includes('login')?'LOG IN':'TIORKHALI MART')}`;},[location.pathname,t,language]);
   return <div className="page-content" key={location.pathname}><Suspense fallback={<div className="card-skeleton my-8"/>}><Routes>
+    <Route path="/help" element={<Help/>}/>
     <Route path="/" element={<Landing/>}/><Route path="/marketplace" element={<Marketplace/>}/><Route path="/login" element={<Login/>}/><Route path="/register" element={<Register/>}/><Route path="/admin/login" element={<AdminLogin/>}/>
     <Route path="/account" element={<ProtectedRoute><Account/></ProtectedRoute>}/><Route path="/manager" element={<ProtectedRoute role="manager"><ManagerDashboard/></ProtectedRoute>}/><Route path="/customer" element={<ProtectedRoute role="customer"><CustomerDashboard/></ProtectedRoute>}/><Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard/></ProtectedRoute>}/><Route path="*" element={<Navigate to="/" replace/>}/>
   </Routes></Suspense></div>;
@@ -43,6 +46,8 @@ export default function App() {
 
   useEffect(() => {
     initialize();
+    const timer=setTimeout(()=>{prefetchPage('/marketplace');const user=useAuthStore.getState().user;if(user)prefetchPage(`/${user.role}`);},800);
+    return()=>clearTimeout(timer);
   }, [initialize]);
 
   return (

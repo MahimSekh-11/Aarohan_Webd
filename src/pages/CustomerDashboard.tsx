@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Phone, MapPin, Package, Store, ShoppingBag, ClipboardList } from 'lucide-react';
 import Marketplace from './Marketplace';
-import { useT } from '../components/Translate';
+import { useT, useProductName } from '../components/Translate';
 import { useSearchParams } from 'react-router-dom';
 
 export default function CustomerDashboard() {
@@ -13,7 +13,7 @@ export default function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState<'browse' | 'requests'>('browse');
   useEffect(() => { setActiveTab(params.get('tab') === 'requests' ? 'requests' : 'browse'); }, [params]);
   const { token } = useAuthStore();
-  const t = useT();
+  const t = useT(),pn=useProductName();
 
   useEffect(() => {
     const fetchLeads = async () => {
@@ -62,13 +62,13 @@ export default function CustomerDashboard() {
               <div className="flex items-center gap-3 mb-4">
                  <div className="w-12 h-12 bg-[#162638] rounded-xl flex items-center justify-center text-[#83D9BD] shrink-0 overflow-hidden border border-[#2B4054]">
                     {(lead.product?.images?.[0] || lead.productDetails?.images?.[0]) ? (
-                      <img src={lead.product?.images?.[0] || lead.productDetails?.images?.[0]} alt={t(lead.product?.name || lead.productDetails?.name || '')} className="w-full h-full object-cover" />
+                      <img src={lead.product?.images?.[0] || lead.productDetails?.images?.[0]} alt={pn(lead.product?.name || lead.productDetails?.name || '')} className="w-full h-full object-cover" />
                     ) : (
                       <Package className="w-6 h-6" />
                     )}
                  </div>
                  <div className="flex-1">
-                   <h3 className="text-sm font-black text-[#F3F6F9] leading-tight mb-1">{t(lead.product?.name || lead.productDetails?.name || '')}</h3>
+                   <h3 className="text-sm font-black text-[#F3F6F9] leading-tight mb-1">{pn(lead.product?.name || lead.productDetails?.name || '')}</h3>
                    <p className="text-[#83D9BD] font-black">₹{lead.product?.actualPrice ?? lead.product?.price ?? lead.productDetails?.actualPrice ?? lead.productDetails?.price}</p>
                  </div>
               </div>

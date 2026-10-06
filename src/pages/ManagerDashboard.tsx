@@ -1,4 +1,4 @@
-import { useT } from '../components/Translate';
+import { useT, useProductName } from '../components/Translate';
 import { useSearchParams } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
@@ -57,7 +57,7 @@ const compressImage = (file: File): Promise<string> => {
 
 export default function ManagerDashboard() {
   const [params] = useSearchParams();
-  const t = useT();
+  const t = useT(),pn=useProductName();
   const [error,setError]=useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
@@ -473,14 +473,14 @@ export default function ManagerDashboard() {
                     <td className="py-3 px-4">
                       <div className="w-12 h-12 rounded-xl bg-[#0D1825] border border-[#2B4054] overflow-hidden flex items-center justify-center text-[#83D9BD] shrink-0 shadow-inner">
                         {p.images?.[0] ? (
-                          <img src={p.images[0]} alt={t(p.name)} className="w-full h-full object-cover" />
+                          <img src={p.images[0]} alt={pn(p.name)} className="w-full h-full object-cover" />
                         ) : (
                           <Package className="w-5 h-5 opacity-55" />
                         )}
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <p className="font-bold text-[#F3F6F9] line-clamp-1 text-sm">{t(p.name)}</p>
+                      <p className="font-bold text-[#F3F6F9] line-clamp-1 text-sm">{pn(p.name)}</p>
                       <p className="text-[10px] text-[#A5B7C8] font-bold uppercase tracking-widest font-sans mt-0.5 max-w-xs truncate">{t(p.description)}</p>
                     </td>
                     <td className="py-3 px-4">
@@ -538,14 +538,14 @@ export default function ManagerDashboard() {
                      <div className="flex items-center gap-3.5">
                        <div className="w-14 h-14 bg-[#0D1825] rounded-2xl flex items-center justify-center shrink-0 overflow-hidden border border-[#2B4054] shadow-inner">
                           {(lead.product?.images?.[0] || lead.productDetails?.images?.[0]) ? (
-                            <img src={lead.product?.images?.[0] || lead.productDetails?.images?.[0]} alt={t(lead.product?.name || lead.productDetails?.name || '')} className="w-full h-full object-cover" />
+                            <img src={lead.product?.images?.[0] || lead.productDetails?.images?.[0]} alt={pn(lead.product?.name || lead.productDetails?.name || '')} className="w-full h-full object-cover" />
                           ) : (
                             <Package className="w-6 h-6 text-[#83D9BD]" />
                           )}
                        </div>
                        <div>
                          <span className="text-[9px] uppercase font-black text-[#83D9BD] font-sans tracking-widest">{lead.product?.category || lead.productDetails?.category || 'micro-item'}</span>
-                         <h3 className="text-base font-black text-[#F3F6F9] leading-tight mt-0.5 line-clamp-1">{t(lead.product?.name || lead.productDetails?.name || '')}</h3>
+                         <h3 className="text-base font-black text-[#F3F6F9] leading-tight mt-0.5 line-clamp-1">{pn(lead.product?.name || lead.productDetails?.name || '')}</h3>
                          <div className="flex gap-2 text-[11px] font-bold text-[#A5B7C8] mt-0.5 font-sans">
                            <span>{t("Qty:")}{lead.product?.quantity ?? lead.productDetails?.quantity ?? 0}</span>
                            <span>|</span>

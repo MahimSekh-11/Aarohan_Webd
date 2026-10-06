@@ -1,5 +1,6 @@
 // Spoken amounts are normalized before extracting product fields. Native digits
 // are handled by normalizeDigits in voiceCommands.
+import { normalizeCategory } from './catalogCommands.js';
 const numberRows = [
   'zero|शून्य|শূন্য|பூஜ்யம்|సున్నా|શૂન્ય',
   'one|एक|এক|ஒன்று|ఒకటి|એક', 'two|दो|দুই|இரண்டு|రెండు|दोन|બે',
@@ -44,7 +45,7 @@ export function productComplete(product?: Record<string,any> | null) {
   return !!product?.name?.trim() && Number.isFinite(product.price) && product.price > 0 && Number.isInteger(product.quantity) && product.quantity > 0;
 }
 const pricePattern = /(?:₹|\b(?:for|at|rs\.?|rupees|price|priced|costs?)\b|कीमत|दाम|প্রাইস|মূল্য|দাম|விலை|ధర|किंमत|કિંમત)\s*(?:is|to|at|of|है|হলো|হবে|[:=])?\s*(\d+(?:\.\d+)?)(?:\s*(?:rupees|rs\b|रुपये|रुपया|টাকা|রুপি|ரூபாய்|రూపాయలు|રૂપિયા))?/iu;
-const quantityPattern = /(?:\b(?:quantity|stock|units)\b|मात्रा|স্টক|সংখ্যা|পরিমাণ|মজুত|அளவு|పరిమాణం|प्रमाण|જથ્થો)\s*(?:is|[:=])?\s*(\d+(?:\.\d+)?)(?:\s*(?:kg|kilos?|kilograms?|pcs|units?|packets?|किलो|কেজি|கிலோ|కిలో|કિલો))?|(?:(\d+(?:\.\d+)?)\s*(?:kg|kilos?|kilograms?|pcs|units?|packets?|किलो|কেজি|கிலோ|కిలో|કિલો))/iu;
+const quantityPattern = /(?:\b(?:quantity|stock|units)\b|मात्रा|স্টক|সংখ্যা|পরিমাণ|মজুত|அளவு|పరిమాణం|प्रमाण|જથ્થો)\s*(?:is|to|হলো|হবে|[:=])?\s*(\d+(?:\.\d+)?)(?:\s*(?:kg|kilos?|kilograms?|pcs|units?|packets?|किलो|কেজি|கிலோ|కిలో|કિલો))?|(?:(\d+(?:\.\d+)?)\s*(?:kg|kilos?|kilograms?|pcs|units?|packets?|किलो|কেজি|கிலோ|కిలో|કિલો))/iu;
 export function extractProduct(text: string, add: RegExp, previous?: Record<string,any> | null) {
   const normalized = normalizeSpokenNumbers(text.replace(/(?:^|\s)(?:একটি|একটা)(?=\s|$)/gu,' ')).replace(/(?<=\d),(?=\d)/g,'');
   const product = { quantity:1, category:'Groceries', deliveryAvailable:false, images:[], ...previous } as Record<string,any>;
@@ -71,4 +72,18 @@ export function extractProduct(text: string, add: RegExp, previous?: Record<stri
   if (name) product.name = name;
   product.description ||= product.name;
   return product;
+}
+export function extractProductUpdates(input:string):Record<string,unknown>{
+  const text=normalizeSpokenNumbers(input).replace(/\b(price|stock|quantity|discount|offer)\s+of\s+(.+?)\s+(?:to|is)\s+(\d+(?:\.\d+)?)/giu,'$1 to $3'),result:Record<string,unknown>={};
+  const price=text.match(pricePattern),quantity=text.match(quantityPattern);
+  if(price)result.price=Number(price[1]);if(quantity)result.quantity=Number(quantity[1] || quantity[2]);
+  const offer=text.match(/(?:\boffer\b|\bdiscount\b|ছাড়|ছাড়|छूट)\s*(?:to|is|[:=])?\s*(\d+(?:\.\d+)?)/iu);if(offer)result.offer=Number(offer[1]);
+  const stop=String.raw`(?=\s+(?:and\s+)?(?:price|quantity|stock|category|delivery|description|discount|offer|name)\b|\s+(?:দাম|সংখ্যা|স্টক|বিভাগ|ডেলিভারি|বিবরণ|নাম)|[,;]|$)`;
+  for(const [field,label]of [['name',String.raw`\bname\b|নাম|नाम`],['description',String.raw`\bdescription\b|বিবরণ|विवरण|விளக்கம்|వివరణ|વર્ણન`],['category',String.raw`\bcategory\b|বিভাগ|শ্রেণি|श्रेणी|வகை|వర్గం|શ્રેણી`]] as const){
+    const match=text.match(new RegExp(String.raw`(?:${label})\s*(?:to\s+|is\s+|হলো\s+|করো\s+|[:=]\s*)?(?:"([^"]+)"|'([^']+)'|(.+?)${stop})`,'iu'));
+    if(match){const value=(match[1] || match[2] || match[3]).trim();if(value)result[field]=field==='category'?normalizeCategory(value):value;}
+  }
+  const delivery=text.match(/(?:\bdelivery\b|ডেলিভারি|डिलीवरी|விநியோகம்|డెలివరీ|વિતરણ)\s*(?:to|is|[:=])?\s*(yes|available|true|no|false|unavailable|हाँ|হ্যাঁ|না|নেই|হবে|অবশ্যই|नहीं|అవును|ஆம்|હા)/iu);
+  if(delivery)result.deliveryAvailable=!/^(no|false|unavailable|না|নেই|नहीं)$/iu.test(delivery[1]);
+  return result;
 }

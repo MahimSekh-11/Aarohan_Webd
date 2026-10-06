@@ -17,8 +17,8 @@ let transcriberLoading: Promise<any> | null = null;
 let translatorLoading: Promise<any> | null = null;
 let translationQueue: Promise<unknown> = Promise.resolve();
 let transcriptionQueue: Promise<unknown> = Promise.resolve();
-const speechState: { state: 'idle' | 'loading' | 'ready' | 'error' } = { state:'idle' };
-export function getSpeechStatus() { return { ...speechState, model:process.env.WHISPER_MODEL || 'Xenova/whisper-small' }; }
+import {speechState} from './speechState.js';
+export {getSpeechStatus} from './speechState.js';
 export async function prepareSpeech() { await loadTranscriber(); }
 
 export const langCodes: Record<string, string> = {

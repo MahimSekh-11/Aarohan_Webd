@@ -1,3 +1,4 @@
+import { productNameExtras } from './productVocabulary.js';
 export function detectTextLanguage(text: string): string {
   if (/[\u0980-\u09ff]/u.test(text)) return 'bn';
   if (/[\u0b80-\u0bff]/u.test(text)) return 'ta';
@@ -27,6 +28,10 @@ export function expandProductSearch(search: string): string[] {
   const normalized = search.trim().toLocaleLowerCase();
   // Retain the literal query and also search common speech/transliteration forms.
   const spokenAliases: Record<string,string> = { rise:'rice', राइस:'rice', রাইস:'rice', chawal:'rice', chal:'rice', doodh:'milk', dudh:'milk', aalu:'potato', aloo:'potato' };
-  const row = productTerms.find(terms => terms.some(term => term === (spokenAliases[normalized] || normalized)));
-  return [...new Set(row ? [search, ...row] : [search])];
+  const rows=[...productTerms,...productNameExtras];
+  const row = rows.find(terms => terms.some(term => term === (spokenAliases[normalized] || normalized)));
+  if(row)return [...new Set([search,...row])];
+  // A displayed composite name must still find its original stored name.
+  const canonical=normalized.split(/\s+/).map(word=>rows.find(row=>row.some(term=>term.toLocaleLowerCase()===(spokenAliases[word] || word)))?.[0] || word).join(' ');
+  return [...new Set([search,...(canonical!==normalized?[canonical]:[])])];
 }

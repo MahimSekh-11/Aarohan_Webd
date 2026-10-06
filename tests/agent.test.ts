@@ -6,6 +6,8 @@ import {parseMemoryInstruction} from '../shared/memoryCommands';
 import {LocalLLMProvider,parseSearchRequest} from '../backend/agent/providers';
 import {validateMemory} from '../src/agent/memory';
 import {productFields} from '../backend/validation';
+import {translateKnownProductName} from '../shared/productNames';
+import {expandProductSearch} from '../shared/languages';
 const context={route:'/marketplace',title:'Mart',visibleItems:[],recentItems:[{id:'0123456789abcdef01234567',name:'Rice',price:100},{id:'1123456789abcdef01234567',name:'Honey',price:200}]};
 test('tools reject arbitrary execution, query operators, injected roles and malformed parameters',()=>{
   for(const call of [{name:'execute_code',args:{code:'process.exit()'}},{name:'navigate',args:{path:'https://evil.example'}},{name:'navigate',args:{path:'javascript:alert(1)'}},{name:'search_products',args:{search:{$ne:null}}},{name:'create_product',args:{name:'Rice',price:NaN}},{name:'create_product',args:{name:'Rice',managerId:'0123456789abcdef01234567'}},{name:'delete_product',args:{id:'hello'}},{name:'update_request',args:{id:context.recentItems[0].id,status:'paid'}},{name:'website_control',args:{command:'eval'}}])assert.throws(()=>validateToolCall(call));
@@ -43,6 +45,42 @@ test('spoken search phrases and listing phrases execute the intended action',asy
     const result=await provider.plan({message:phrase,language:'en',history:[],context},'manager');assert.equal(result.calls[0].name,'create_product');assert.equal(result.calls[0].args.name,'rice');assert.equal(result.calls[0].args.price,200);assert.equal(result.calls[0].args.quantity,5);
   }
   const selected=await provider.plan({message:'find this product',language:'en',history:[],context:{...context,selectedProductId:context.recentItems[1].id}});assert.equal(selected.calls[0].args.id,context.recentItems[1].id);
+  for(const phrase of ['यह ऑर्डर करो','এটা অর্ডার করো','இந்த பொருளை வாங்க','ఈ వస్తువు కొనాలి','हे खरेदी करा','આ ખરીદવું']){
+    const order=await provider.plan({message:phrase,language:'en',history:[],context:{...context,selectedProductId:context.recentItems[1].id}});assert.equal(order.calls[0].name,'request_product');assert.equal(order.calls[0].args.id,context.recentItems[1].id);
+  }
+});
+test('voice filters combine and preserve location, store, category and both price bounds',async()=>{
+  const query=parseSearchRequest('show rice in Kolkata from Green Store category groceries between 100 and 500');
+  assert.deepEqual(query,{location:'kolkata',storeName:'green store',category:'Groceries',minPrice:100,maxPrice:500,search:'rice',sort:'newest'});
+  assert.equal(parseSearchRequest('filter by location Kolkata').location,'kolkata');
+  assert.equal(parseSearchRequest('filter by store name Green Store').storeName,'green store');
+  assert.equal(parseSearchRequest('show products category Electronics under 500').category,'Electronics');
+  assert.deepEqual(parseSearchRequest('clear all filters',query),{sort:'newest'});
+  const next=parseSearchRequest('only delivery available',query);assert.equal(next.location,'kolkata');assert.equal(next.minPrice,100);assert.equal(next.deliveryAvailable,true);assert.equal(next.search,'rice');
+  const native=parseSearchRequest('চাল খুঁজুন লোকেশন কলকাতা দোকান Green Store বিভাগ মুদিখানা ৫০০ টাকার মধ্যে');assert.equal(native.location,'কলকাতা');assert.equal(native.storeName,'green store');assert.equal(native.category,'Groceries');assert.equal(native.maxPrice,500);assert.equal(native.search,'চাল');
+});
+test('details, navigation and updates use precise validated references and fields',async()=>{
+  const provider=new LocalLLMProvider(),selected={...context,selectedProductId:context.recentItems[1].id};
+  const plan=(message:string)=>provider.plan({message,language:'en',history:[],context:selected},'manager');
+  assert.deepEqual((await plan('show this product details')).calls,[{name:'get_product',args:{id:context.recentItems[1].id}}]);
+  for(const [phrase,path]of [['go to home page','/'],['move to marketplace','/marketplace'],['open inventory','/manager'],['open add product page','/manager?view=add'],['go to account','/account']])assert.equal((await plan(phrase)).calls[0].args.path,path);
+  const updated=await plan('update this product price to 180 stock 4 category hardware description fresh local honey delivery yes discount 10');
+  assert.equal(updated.calls[0].name,'update_product');assert.deepEqual(updated.calls[0].args,{id:context.recentItems[1].id,price:180,quantity:4,category:'Hardware',description:'fresh local honey',deliveryAvailable:true,offer:10});
+  const renamed=await plan('change this product name to Pure Honey Comb');assert.equal(renamed.calls[0].args.name,'pure honey comb');
+  assert.equal((await plan('update this product description fresh local rice')).calls[0].args.id,context.recentItems[1].id,'A name inside the new description must never choose another product');
+  assert.deepEqual((await plan('change the price of Rice to two hundred fifty')).calls[0].args,{id:context.recentItems[0].id,price:250});
+  assert.deepEqual((await plan('update Laptop price to 250')).calls[0].args,{search:'laptop',price:250},'An explicit different name must not update the open product');
+  assert.deepEqual((await plan('remove all filters')).calls,[{name:'search_products',args:{sort:'newest'}}],'Removing filters must not delete a selected product');
+  assert.equal((await provider.plan({message:'show details of basmati rice',language:'en',history:[],context:{...context,visibleItems:[],recentItems:[]}})).calls[0].args.search,'basmati rice');
+});
+test('translated product names keep searchable original identity in every UI locale',async()=>{
+  const translations=['Basmati rice','बासमती चावल','বাসমতি চাল','பாஸ்மதி அரிசி','బాస్మతి బియ్యం','बासमती तांदूळ','બાસમતી ચોખા'];
+  for(const [index,language]of ['en','hi','bn','ta','te','mr','gu'].entries()){
+    const named=translateKnownProductName('Basmati rice',language);assert.equal(named.complete,true);assert.equal(named.text.toLocaleLowerCase(),translations[index].toLocaleLowerCase());
+  }
+  assert.equal(translateKnownProductName('বাসমতি চাল','en').text,'basmati rice');assert.ok(expandProductSearch('বাসমতি চাল').includes('basmati rice'));
+  const provider=new LocalLLMProvider();const result=await provider.plan({message:'বাসমতি চাল অর্ডার করো',language:'bn',history:[],context:{...context,recentItems:[{id:context.recentItems[0].id,name:'Basmati rice',displayName:'বাসমতি চাল'}]}});
+  assert.equal(result.calls[0].args.id,context.recentItems[0].id);
 });
 test('language detection supports native scripts and mixed transliteration',()=>{
   for(const [text,expected]of [['আমাকে চাল দাও','bn'],['मुझे चावल चाहिए','hi'],['मला तांदूळ पाहिजे','mr'],['அரிசி தேடு','ta'],['బియ్యం వెతుకు','te'],['ચોખા શોધો','gu'],['ಅಕ್ಕಿ','kn'],['അരി','ml'],['ਚੌਲ','pa'],['چاول','ur'],['amar jonno rice dao','banglish'],['mujhe rice chahiye','hinglish']] as const)assert.equal(detectAgentLanguage(text),expected);

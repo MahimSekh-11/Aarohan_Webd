@@ -15,6 +15,7 @@ import { getWebsiteContext } from '../agent/context';
 import { t as translateReply } from '../i18n/translations';
 import { parseMemoryInstruction } from '../../shared/memoryCommands';
 import { isVoiceConfirmation, isVoiceCancellation } from '../../shared/voiceCommands';
+import {pageNavigation} from '../../shared/catalogCommands';
 
 export default function VoiceAgent() {
   const t=useT(),navigate=useNavigate();
@@ -32,6 +33,7 @@ export default function VoiceAgent() {
   useEffect(() => {alive.current=true;return () => {alive.current=false;request.current?.abort();};},[]);
   useEffect(()=>{request.current?.abort();input.cancel();output.stop();setHistory([]);setDraft(null);setPending(null);task.current={};voiceSession.current=false;},[user?._id]);
   useEffect(() => {const handler=() => setOpen(true);window.addEventListener('agent-open',handler);return () => window.removeEventListener('agent-open',handler);},[]);
+  useEffect(()=>{const handler=(event:Event)=>{const command=(event as CustomEvent).detail;if(typeof command==='string'){setOpen(true);setText(command.slice(0,1500));}};window.addEventListener('agent-example',handler);return()=>window.removeEventListener('agent-example',handler);},[]);
   useEffect(() => {scroll.current?.scrollTo({top:scroll.current.scrollHeight,behavior:'smooth'});},[history,input.transcript]);
   useEffect(() => {
     if(previousUILanguage.current===currentLang)return;previousUILanguage.current=currentLang;
@@ -58,11 +60,13 @@ export default function VoiceAgent() {
     const messages=[...history,{role:'user',text:value}] as AgentMessage[];setHistory(messages.slice(-20));
     if(rememberCommand(value))return;
     if(isVoiceCancellation(value)){setDraft(null);setPending(null);task.current.draft=undefined;followup.current=false;voiceSession.current=false;respond('Cancelled');return;}
+    const page=!pending&&!draft?pageNavigation(value,user?.role):undefined;
+    if(page&&!/requests|leads/.test(page)){followup.current=false;navigate(page);respond('Opening page',language==='auto'&&detected?detected:undefined);return;}
     locked.current=true;setBusy(true);output.stop();
     const controller=new AbortController();request.current=controller;const timer=setTimeout(() => controller.abort(new DOMException('Timed out','TimeoutError')),45000);
     try {
       const reviewing=override || (isVoiceConfirmation(value) && draft ? draft : undefined);
-      const body={message:reviewing ? `add product name ${reviewing.name}, price ${reviewing.price}, quantity ${reviewing.quantity}` : value,language:language==='auto' && detected?detected:language,history:messages.slice(-10),context:{...getWebsiteContext(),recentItems:task.current.items,search:task.current.search,draft:reviewing || task.current.draft},pending:pending?.id,autoSave:reviewing ? true : autoSave,confident,preferences:memory.enabled ? {budget:memory.budget,category:memory.category} : {}};
+      const body={message:reviewing ? `add product name ${reviewing.name}, price ${reviewing.price}, quantity ${reviewing.quantity}` : value,language:language==='auto' && detected?detected:language,history:messages.slice(-10),context:{recentItems:task.current.items,search:task.current.search,draft:reviewing || task.current.draft,...getWebsiteContext()},pending:pending?.id,autoSave:reviewing ? true : autoSave,confident,preferences:memory.enabled ? {budget:memory.budget,category:memory.category} : {}};
       const response=await fetch('/api/agent/message',{method:'POST',headers:{'Content-Type':'application/json',...(token ? {Authorization:`Bearer ${token}`} : {})},body:JSON.stringify(body),signal:controller.signal});
       const result:AgentResult=await response.json();if(!response.ok || !result.reply)throw new Error((result as any).message || 'The assistant could not finish this request. Please try again.');
       if(!alive.current || controller.signal.aborted)return;
@@ -70,7 +74,12 @@ export default function VoiceAgent() {
       if(result.items)task.current.items=result.items;if(result.search)task.current.search=result.search;
       followup.current=!!result.pending || (!!result.draft && !productComplete(result.draft));
       for(const action of result.actions){
-        if(action.type==='navigate' && action.path && /^\/(?!\/)/.test(action.path))navigate(action.path);
+        if(action.type==='navigate' && action.path && /^\/(?!\/)/.test(action.path)){
+          const destination=new URL(action.path,window.location.origin);
+          if(window.location.pathname==='/marketplace'&&destination.pathname==='/marketplace'&&destination.searchParams.has('product')&&[...destination.searchParams.keys()].length===1){
+            const filters=new URLSearchParams(window.location.search);filters.set('product',destination.searchParams.get('product')!);navigate(`/marketplace?${filters}`);
+          }else navigate(action.path);
+        }
         if(action.type==='refresh'){window.dispatchEvent(new Event('products-updated'));window.dispatchEvent(new Event('requests-updated'));window.dispatchEvent(new Event('account-updated'));}
         if(action.type==='website_control'){
           if(action.command==='back')navigate(-1);
@@ -87,7 +96,7 @@ export default function VoiceAgent() {
   return <aside className="voice-dock" aria-label={t('Voice Assistant')}>
     <AnimatePresence>{open && <motion.section initial={{opacity:0,y:18,scale:0.97}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:12,scale:0.97}} id="voice-assistant-panel" className="agent-panel" aria-label={t('Voice Assistant')}>
       <div className="agent-header"><div className="agent-emblem"><Sparkles size={20}/></div><div className="flex-1"><h2>{t('Voice Assistant')}</h2><p className="agent-status" role="status"><span className={input.listening ? 'status-dot listening' : 'status-dot'}/>{t(status)}</p></div><button className="icon-button" aria-label={t('Close')} onClick={close}><X size={18}/></button></div>
-      <div className="agent-language"><label htmlFor="agent-language">{t('Language')}</label><select id="agent-language" aria-label={t('Assistant language')} value={language} onChange={e => chooseLanguage(e.target.value as AgentLanguage)}>{Object.entries(agentLanguages).map(([key,value]) => <option key={key} value={key}>{key==='auto'?t('Auto Detect'):value.name}</option>)}</select></div>
+      <div className="agent-language"><label htmlFor="agent-language">{t('Language')}</label><select id="agent-language" aria-label={t('Assistant language')} value={language} onChange={e => chooseLanguage(e.target.value as AgentLanguage)}>{Object.entries(agentLanguages).map(([key,value]) => <option key={key} value={key}>{key==='auto'?t('Auto Detect'):value.name}</option>)}</select><button className="icon-button" aria-label={t('Voice command help')} onClick={()=>{close();navigate('/help');}}>?</button></div>
       <div ref={scroll} className="agent-conversation" role="log" aria-live="polite" aria-relevant="additions">
         {history.length===0 && <div className="agent-welcome"><div className="voice-orb"><Mic size={27}/></div><h3>{t('How can I help?')}</h3><p>{t('Ask me to search products, open your dashboard or requests, or add a product.')}</p><div className="agent-suggestions">{['Explore Marketplace','My Requests'].map(label => <button key={label} onClick={() => void handleText(label==='My Requests' ? 'show my requests' : 'open marketplace')}>{t(label)}</button>)}</div></div>}
         {history.map((message,index) => <div className={`chat-message ${message.role}`} key={index}><span>{message.role==='user' ? t('You said:') : t('Voice Assistant')}</span><p dir="auto" lang={agentLanguages[detectAgentLanguage(message.text)].base}>{message.text}</p></div>)}
@@ -96,7 +105,7 @@ export default function VoiceAgent() {
         {engineState==='error' && <p className="agent-note">{t('Local speech engine is unavailable. Check that the backend server is running.')}</p>}
         {(error || output.error) && <p className="agent-error" role="alert">{t(error || output.error)}</p>}
         {draft && <div className="agent-draft">{(['name','price','quantity'] as const).map(field => <label key={field}>{t(field==='name' ? 'Product Name' : field==='price' ? 'Price' : 'Quantity')}<input aria-label={t(field==='name' ? 'Product Name' : field==='price' ? 'Price' : 'Quantity')} type={field==='name' ? 'text' : 'number'} min={field==='name' ? undefined : field==='quantity'?1:0.01} step={field==='quantity'?'1':'any'} value={draft[field] ?? ''} onChange={e => setDraft({...draft,[field]:field==='name' ? e.target.value : Number(e.target.value)})}/></label>)}<div className="flex gap-2"><button className="button-primary" disabled={busy || !productComplete(draft)} onClick={() => void handleText('confirm',true,draft)}>{t('Confirm')}</button><button className="button-secondary" onClick={() => void handleText('cancel')}>{t('Cancel')}</button></div></div>}
-        {pending && <div className="agent-draft"><p>{reply}</p><div className="flex gap-2"><button className="button-primary" disabled={busy} onClick={() => void handleText('confirm')}>{t('Confirm')}</button><button className="button-secondary" onClick={() => void handleText('cancel')}>{t('Cancel')}</button></div></div>}
+        {pending && <div className="agent-draft"><p>{reply}</p>{pending.name==='update_product'&&<dl className="space-y-2">{Object.entries(pending.args).filter(([key])=>!['id','search'].includes(key)).map(([key,value])=><div className="flex justify-between gap-3" key={key}><dt>{t(({name:'Product Name',description:'Description',price:'Price',quantity:'Quantity',category:'Category',offer:'Offer / Discount (%)',deliveryAvailable:'Delivery Available'} as Record<string,string>)[key] || key)}</dt><dd>{typeof value==='boolean'?t(value?'Available':'Not Available'):String(value)}</dd></div>)}</dl>}<div className="flex gap-2"><button className="button-primary" disabled={busy} onClick={() => void handleText('confirm')}>{t('Confirm')}</button><button className="button-secondary" onClick={() => void handleText('cancel')}>{t('Cancel')}</button></div></div>}
         {showMemory && <div className="agent-draft"><h3>{t('Saved preferences')}</h3><label className="flex gap-2"><input type="checkbox" checked={memory.enabled} onChange={e => memory.setEnabled(e.target.checked)}/>{t('Enable memory')}</label>{(['language','budget','category'] as const).filter(key => memory[key]!==undefined).map(key => <div className="flex justify-between items-center" key={key}><span>{t(key==='language'?'Language':key==='budget'?'Budget':'Category')}: {key==='language'?agentLanguages[memory.language!].name:key==='category'?t(memory.category!):String(memory.budget)}</span><button className="icon-button" aria-label={t('Forget preference')} onClick={() => memory.forget(key)}><Trash2 size={14}/></button></div>)}<button className="button-secondary" onClick={() => memory.forget()}>{t('Clear memories')}</button></div>}
       </div>
       <div className="agent-toolbar"><button className="icon-button" aria-label={t(output.muted ? 'Unmute' : 'Mute')} onClick={() => output.setMuted(!output.muted)}>{output.muted ? <VolumeX size={16}/> : <Volume2 size={16}/>}</button><button className="icon-button" aria-label={t('Replay reply')} onClick={() => {output.unlock();void output.speak(reply,replyLanguage);}}><MessageCircle size={16}/></button><button className="icon-button" aria-label={t('Stop speaking')} onClick={output.stop}><Square size={14}/></button><button className="icon-button" aria-label={t('Saved preferences')} onClick={() => setShowMemory(!showMemory)}><Brain size={16}/></button><button className="icon-button ml-auto" aria-label={t('Clear conversation')} onClick={() => {input.cancel();output.stop();setHistory([]);setDraft(null);setPending(null);task.current={};voiceSession.current=false;}}><Trash2 size={16}/></button></div>

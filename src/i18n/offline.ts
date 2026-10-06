@@ -1,7 +1,13 @@
 import { productTerms } from '../../shared/languages';
 // Columns: English | Hindi | Bengali | Tamil | Telugu | Marathi | Gujarati.
 // These UI translations are bundled and never require a model download.
+import {helpRows} from './help';
 const rows = `
+Location|स्थान|অবস্থান|இடம்|ప్రాంతం|ठिकाण|સ્થળ
+Available|उपलब्ध|পাওয়া যায়|கிடைக்கும்|అందుబాటులో ఉంది|उपलब्ध|ઉપલબ્ધ
+Not Available|उपलब्ध नहीं|পাওয়া যায় না|கிடைக்காது|అందుబాటులో లేదు|उपलब्ध नाही|ઉપલબ્ધ નથી
+Minimum price|न्यूनतम कीमत|সর্বনিম্ন দাম|குறைந்தபட்ச விலை|కనిష్ట ధర|किमान किंमत|લઘુત્તમ કિંમત
+All Stores|सभी दुकानें|সব দোকান|அனைத்து கடைகள்|అన్ని దుకాణాలు|सर्व दुकाने|બધી દુકાનો
 What is the quantity? Say a positive whole number.|मात्रा कितनी है? सकारात्मक पूर्ण संख्या कहें।|পরিমাণ কত? শূন্যের বেশি পূর্ণ সংখ্যা বলুন।|அளவு என்ன? நேர்மறை முழு எண்ணைக் கூறவும்.|పరిమాణం ఎంత? సున్నా కంటే ఎక్కువ పూర్ణ సంఖ్య చెప్పండి.|प्रमाण किती? शून्यापेक्षा मोठी पूर्ण संख्या सांगा.|જથ્થો કેટલો છે? શૂન્ય કરતાં મોટી પૂર્ણ સંખ્યા કહો.
 
 Auto Detect|अपने आप पहचानें|স্বয়ংক্রিয় শনাক্তকরণ|தானாகக் கண்டறி|స్వయంగా గుర్తించు|आपोआप ओळखा|આપોઆપ ઓળખો
@@ -294,7 +300,7 @@ Chief Developer|मुख्य डेवलपर|প্রধান ডেভ�
 Developed with passion by|प्रेम से बनाया गया|যত্ন নিয়ে তৈরি করেছেন|அன்புடன் உருவாக்கியவர்|ప్రేమతో రూపొందించినవారు|प्रेमाने विकसित केले|પ્રેમથી બનાવ્યું
 `;
 export const offline: Record<string, Record<string, string>> = { hi: {}, bn: {}, ta: {}, te: {}, mr: {}, gu: {} };
-for (const row of rows.trim().split('\n')) {
+for (const row of `${rows}\n${helpRows}`.trim().split('\n').filter(row=>row.trim())) {
   const [key, ...values] = row.split('|');
   ['hi','bn','ta','te','mr','gu'].forEach((lang, index) => { offline[lang][key] = values[index]; });
 }
