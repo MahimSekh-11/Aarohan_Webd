@@ -6,8 +6,8 @@ An elite, full-stack, hyper-local e-commerce ecosystem designed to empower villa
 
 ## 🎨 Design Vision & Aesthetic
 
-VillageMart is crafted around the **Slate Horizon** aesthetic—pairing deep, eye-safe slate canvases with electric violet and emerald accents. Focused heavily on negative space, legible typography, and real-time community engagement, it offers:
-* **Modern Typography**: Bold "Inter" UI elements paired with monospace status arrays.
+VillageMart is crafted around the **Slate Horizon** aesthetic—pairing deep, eye-safe slate canvases with mint, warm apricot and ivory accents. Focused heavily on negative space, legible typography, and real-time community engagement, it offers:
+* **Modern Typography**: Readable system fonts with native script fallbacks.
 * **Micro-Interactions**: Fluid entry paths and layout shifts handled seamlessly via `motion`.
 * **Zero Latency Visuals**: Low-bandwidth optimization techniques ensuring immediate rendering over rural networks.
 
@@ -43,7 +43,7 @@ Instead of introducing complex payment barriers for rural transactions, VillageM
 | **Animations** | `motion` (`motion/react`) | Fluid, hardware-accelerated user experience transitions. |
 | **State Management** | Zustand | Global lightweight store orchestration for reactive authentication. |
 | **Backend API** | Express.js | Secure routing middleware, token parsing, and product/lead CRUD endpoints. |
-| **Database** | MongoDB + Mongoose | Highly schema-flexible storage of models (Users, Products, Leads) with automatic Atlas or local fallback. |
+| **Database** | MongoDB + Mongoose | Highly schema-flexible storage of models (Users, Products, Leads) with Atlas persistence and an explicit local preview replica set. |
 
 ---
 
@@ -66,7 +66,7 @@ Instead of introducing complex payment barriers for rural transactions, VillageM
 │   │   └── Marketplace.tsx         # Customer showcase and filtering deck
 │   ├── store/              # Global state declarations (Zustand Auth Store)
 │   └── main.tsx            # React application entry point
-├── server.ts               # Express Server with incorporated Vite Dev Middleware
+├── server.ts               # Standalone host using the shared serverless API
 ├── package.json            # Manifest file declaring dependencies and build workflows
 └── .env.example            # Environment variables placeholder
 ```
@@ -77,7 +77,7 @@ Instead of introducing complex payment barriers for rural transactions, VillageM
 
 ### Prerequisites
 * **Node.js 22** Installed
-* **MongoDB** connection string (or defaults automatically to an in-memory test database)
+* **MongoDB replica set / Atlas** connection string (temporary preview storage is used only when no URI is configured in development)
 
 ### Installation
 1. Install project dependencies:
@@ -91,14 +91,14 @@ Instead of introducing complex payment barriers for rural transactions, VillageM
    *Within `.env`, you can customize security secrets and backend binding ports.*
 
 ### Running locally
-* **Development Mode** (Vite Dev Server integrated into Express backend):
+* **Development Mode** (Vite frontend and watched Express backend):
   ```bash
   npm run dev
   ```
   Open `http://localhost:5173` to start interacting.
 
 * **Production Compilation**:
-  Bundles client assets and transpiles server TypeScript cleanly under `dist/`:
+  Bundles client assets and bundles the private backend into `build/server.mjs` and the public frontend into `dist/`:
   ```bash
   npm run build
   npm start
@@ -132,18 +132,12 @@ Set `MONGODB_URI` and `JWT_SECRET` in Vercel's Preview and Production environmen
 
 `npm run test:deployment` creates the deployment build, then runs its exact entry with plain Node, checks native WAV replies in all seven languages, and tests database connection concurrency and failures without touching a real database. Model caches use the writable temporary directory on Vercel. Model downloads still need network access, memory and enough request time; the large NLLB translation model can exceed [serverless filesystem limits](https://vercel.com/docs/functions/runtimes), so use a persistent backend for that model in production. Bundled interface translations and native reply synthesis do not need a model download.
 
-## Languages and voice assistant
+## Multilingual assistant and refreshed UI
 
-Use the language menu to choose English, Hindi, Bengali, Tamil, Telugu, Marathi, or Gujarati. Page labels, buttons, headings, statuses, and assistant replies are bundled with the app and change immediately without downloading AI models. Personal names and store brands remain unchanged. Common product names also have bundled translations; other catalog descriptions and reviews use server translation with automatic source-script detection.
+The app now uses a consistent navy, mint and apricot theme across the landing page, marketplace, account forms and all three dashboards. The floating assistant supports voice and typed conversation, selected native languages, product drafts, validated website actions, expiring confirmations and removable preferences. Routes load separately, animations respect reduced-motion preferences, and the marketplace includes discounted-price filtering, sorting, visible loading/retry states and keyboard-accessible product dialogs.
 
-The microphone opens an assistant with a live transcript and a typed-command option. Browser speech recognition uses the chosen native locale while a parallel PCM recording provides automatic local recovery when the browser service fails. Examples: `find rice`, `चावल खोजो`, `চাল খুঁজুন`, `அரிசி தேடு`, `బియ్యం వెతుకు`, `तांदूळ शोधा`, or `ચોખા શોધો`. The assistant can search products, open the marketplace, dashboard, requests, login or registration, filter delivery products, scroll up/down, go back, read the current page aloud, and create listings for a signed-in manager.
+See [the complete implementation and setup guide](docs/VOICE_AGENT.md) for architecture, supported languages/actions, changed files, provider configuration, database requirements, privacy, memory controls and test instructions.
 
-Complete product commands save automatically by default: `add rice price two hundred rupees quantity five units` or `চাল যোগ করুন দুইশো টাকা`. You can also say `add new product`; the agent asks for the name and price, listens again after each spoken question, and combines your answers before saving. Optional labeled details include description, category, stock and delivery. Native digits, common native number words, English number words and decimals are supported. Switch off **Save complete products automatically** to review and edit the name, price and quantity before confirming by voice or button. Low-confidence browser results also require review. Recognition can still mishear accents, background noise or short phrases; the transcript and editable fields allow correction. No claim of human microphone accuracy is made by the automated tests.
+For broad natural language understanding and serverless speech, configure `GEMINI_API_KEY` in backend environment settings. No provider key is bundled into the client. Without a key, supported core commands use the local parser and microphone fallback uses multilingual Whisper. Existing bundled UI translations cover seven languages immediately. The assistant offers thirteen language choices plus automatic detection; voice quality and broader understanding depend on the selected providers.
 
-Speak, then pause or tap the microphone again. A pause after speech submits the command automatically. If browser recognition fails, the same recording is sent to local multilingual Whisper with the selected language; no second recording is required. **Use audio fallback** starts local recording directly. WAV is captured as PCM, avoiding WebM or MP4 decoder errors. Opening the assistant prepares the speech engine and shows its readiness. The fallback downloads `Xenova/whisper-base` on first use; set `WHISPER_MODEL` to choose another compatible multilingual Whisper model. Dynamic catalog translation downloads the NLLB model on first use. Both downloads need network access and sufficient memory; static interface translation and native text commands work without these models.
-
-Microphone recording requires localhost or HTTPS and browser permission. Browser recognition availability varies; some browsers send audio to their recognition service. Replies use an installed native voice when available, otherwise the backend generates native WAV audio using [eSpeak-NG](https://github.com/echogarden-project/espeak-ng-emscripten) in all seven languages. The bundled fallback voice sounds synthetic and needs no speech API key or Windows voice installation. Its dependency is licensed GPL-3.0; its source and license are included with the package. The replay button retries playback. See [MDN's speech recognition documentation](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition).
-
-Both frontend and backend must run: start `npm run dev`, then open `http://localhost:5173`. Development now watches backend changes as well as frontend changes. The assistant automatically rechecks backend readiness after connection failures. If an older server already occupies port 3000, stop that project server before starting the updated version. For production use `npm run build` followed by `npm start`; the backend is built as `dist/server.mjs` so ESM speech libraries load correctly. A frontend-only preview cannot provide local recognition or reply audio.
-
-Validation: `npm run lint`, `npm test`, and `npm run build`. For browser integration tests, start Vite at `http://127.0.0.1:5178` and run `npm run test:browser`. These browser tests mock recognition and microphone input; they verify language selection, tool actions, confirmation, automatic network-error recovery, and native reply requests. The unit suite also generates actual native speech in all languages. `npm run test:speech-http` tests the real speech endpoints in the production module format with synthesized input; it requires the Whisper model and measures service functionality, not human speech accuracy.
+Run `npm run lint`, `npm test`, `npm run test:agent`, `npm run test:browser`, and `npm run test:deployment`. Browser tests require Vite on port 5178 (or set `BROWSER_TEST_ORIGIN`) and use real isolated MongoDB data with simulated microphones and speech services. `npm run test:speech-http` performs a real synthesized-audio Whisper round trip. Real accent/noise evaluation and live Gemini API calls need microphone samples/provider credentials.

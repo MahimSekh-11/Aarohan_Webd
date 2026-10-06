@@ -5,6 +5,10 @@ import { defineConfig } from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    build:{rollupOptions:{output:{manualChunks(id){
+      if(/node_modules\/(?:motion|framer-motion|motion-dom|motion-utils)\//.test(id.replace(/\\/g,'/')))return 'motion';
+      if(/node_modules\/(?:react|react-dom|react-router|react-router-dom|scheduler)\//.test(id.replace(/\\/g,'/')))return 'framework';
+    }}}},
     optimizeDeps: {
       exclude: ['@xenova/transformers', 'wavefile', 'multer', 'onnxruntime-node', 'express', 'mongoose', 'mongodb-memory-server']
     },

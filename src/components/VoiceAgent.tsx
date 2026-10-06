@@ -1,303 +1,108 @@
 import { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Loader2, X, Send, Volume2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Mic, MicOff, Loader2, X, Send, Volume2, VolumeX, Square, Sparkles, Trash2, ChevronDown, ShieldCheck, Brain, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useLanguageStore, LANGUAGE_NAMES } from '../store/useLanguageStore';
+import { useLanguageStore, LANGUAGE_NAMES, type Language } from '../store/useLanguageStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useT } from './Translate';
-import { startPcmRecording } from '../lib/audio';
-import { parseNativeCommand, speechLocales, type VoiceIntent } from '../../shared/voiceCommands';
+import { agentLanguages, detectAgentLanguage, type AgentLanguage } from '../../shared/agentLanguages';
+import { type AgentMessage, type AgentResult } from '../../shared/agent';
 import { productComplete } from '../../shared/productVoice';
-
-interface Recognition {
-  lang: string; continuous: boolean; interimResults: boolean;
-  onresult: ((event: any) => void) | null; onerror: ((event: any) => void) | null; onend: (() => void) | null;
-  start(): void; stop(): void; abort(): void;
-}
+import { useVoiceInput } from '../agent/useVoiceInput';
+import { useVoiceOutput } from '../agent/useVoiceOutput';
+import { useAgentMemory } from '../agent/memory';
+import { getWebsiteContext } from '../agent/context';
+import { t as translateReply } from '../i18n/translations';
+import { parseMemoryInstruction } from '../../shared/memoryCommands';
 
 export default function VoiceAgent() {
-  const t = useT();
-  const language = useLanguageStore(s => s.currentLang);
-  const { user, token } = useAuthStore();
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [text, setText] = useState('');
-  const [transcript, setTranscript] = useState('');
-  const [reply, setReply] = useState('Ask me to search products, open your dashboard or requests, or add a product.');
-  const [draft, setDraft] = useState<Record<string, any> | null>(null);
-  const [autoSave, setAutoSave] = useState(true);
-  const draftRef = useRef(draft); draftRef.current = draft;
-  const recognition = useRef<Recognition | null>(null);
-  const pcm = useRef<Awaited<ReturnType<typeof startPcmRecording>> | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const session = useRef(0);
-  const locked = useRef(false);
-  const controller = useRef<AbortController | null>(null);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const nativeVoice = voices.find(v => v.lang.split('-')[0] === language);
-  const playback = useRef<AudioContext | null>(null);
-  const speaker = useRef<AudioBufferSourceNode | null>(null);
-  const speechRequest = useRef<AbortController | null>(null);
-  const speechVersion = useRef(0);
-  const followup = useRef(false);
-  const continueListening = useRef<() => void>(() => {});
-  continueListening.current = () => {
-    if (followup.current && open && autoSave && draftRef.current && !productComplete(draftRef.current)) {
-      followup.current = false;
-      void toggleRecording();
-    }
-  };
-  const [speechError, setSpeechError] = useState('');
-  const [engineState, setEngineState] = useState('idle');
+  const t=useT(),navigate=useNavigate();
+  const currentLang=useLanguageStore(s => s.currentLang),setUILanguage=useLanguageStore(s => s.setLanguage);
+  const {user,token}=useAuthStore();const memory=useAgentMemory();
+  const [open,setOpen]=useState(false),[text,setText]=useState(''),[busy,setBusy]=useState(false),[autoSave,setAutoSave]=useState(true),[showMemory,setShowMemory]=useState(false);
+  const [language,setLanguage]=useState<AgentLanguage>((memory.enabled && memory.language) || currentLang),[replyLanguage,setReplyLanguage]=useState<AgentLanguage>(currentLang);
+  const [history,setHistory]=useState<AgentMessage[]>([]),[reply,setReply]=useState('Ask me to search products, open your dashboard or requests, or add a product.');
+  const [draft,setDraft]=useState<Record<string,any>>(null),[pending,setPending]=useState<AgentResult['pending']>(null),[error,setError]=useState(''),[engineState,setEngineState]=useState('idle'),[cloudSpeech,setCloudSpeech]=useState(false);
+  const task=useRef<{draft?:Record<string,any>;search?:Record<string,unknown>;items?:any[]}>({}),request=useRef<AbortController>(null),locked=useRef(false),voiceSession=useRef(false),followup=useRef(false),alive=useRef(true),scroll=useRef<HTMLDivElement>(null);
+  const latest=useRef<any>({});const previousUILanguage=useRef(currentLang);
+  const output=useVoiceOutput(() => {if(followup.current && voiceSession.current && latest.current.open){followup.current=false;void latest.current.start();}});
+  const input=useVoiceInput(language,(value,confident,detected) => {void handleText(value,confident,undefined,detected);},message => {setError(message);voiceSession.current=false;});
+  latest.current={open,start:() => input.start()};
+  useEffect(() => {alive.current=true;return () => {alive.current=false;request.current?.abort();};},[]);
+  useEffect(()=>{request.current?.abort();input.cancel();output.stop();setHistory([]);setDraft(null);setPending(null);task.current={};voiceSession.current=false;},[user?._id]);
+  useEffect(() => {const handler=() => setOpen(true);window.addEventListener('agent-open',handler);return () => window.removeEventListener('agent-open',handler);},[]);
+  useEffect(() => {scroll.current?.scrollTo({top:scroll.current.scrollHeight,behavior:'smooth'});},[history,input.transcript]);
   useEffect(() => {
-    if (!open) return;
-    setEngineState('loading');
-    const abort = new AbortController(); let stopped = false;
-    let next: ReturnType<typeof setTimeout>;
-    async function check() {
-      try {
-        const response = await fetch('/api/ai/speech/status',{ signal:abort.signal });
-        if (!response.ok) throw new Error('Server unavailable');
-        const status = await response.json();
-        if (stopped) return;
-        setEngineState(status.state);
-        next = setTimeout(check,status.state === 'ready' ? 15000 : 3000);
-      } catch { if (!stopped) { setEngineState('error'); next = setTimeout(check,3000); } }
-    }
-    void check();
-    return () => { stopped = true; clearTimeout(next); abort.abort(); };
-  }, [open]);
-  function unlockSpeaker() {
-    playback.current ??= new AudioContext();
-    void playback.current.resume();
-  }
-  function stopSpeaking() {
-    speechVersion.current++;
-    speechRequest.current?.abort();
-    speaker.current?.stop(); speaker.current = null;
-    window.speechSynthesis?.cancel();
-  }
-
-  function cancelCapture() {
-    followup.current = false;
-    session.current++;
-    if (timer.current) clearTimeout(timer.current);
-    recognition.current?.abort(); recognition.current = null;
-    pcm.current?.cancel(); pcm.current = null;
-    controller.current?.abort(); controller.current = null;
-    locked.current = false;
-    stopSpeaking();
-  }
+    if(previousUILanguage.current===currentLang)return;previousUILanguage.current=currentLang;
+    if(language!=='auto' && agentLanguages[language].base !== currentLang){setLanguage(currentLang);}
+    output.stop();input.cancel();voiceSession.current=false;followup.current=false;
+  },[currentLang]);
   useEffect(() => {
-    setRecording(false); setBusy(false); setTranscript(''); setDraft(null);
-    return cancelCapture;
-  }, [language]);
-  useEffect(() => {
-    const update = () => setVoices(window.speechSynthesis?.getVoices() || []);
-    update(); window.speechSynthesis?.addEventListener('voiceschanged', update);
-    return () => window.speechSynthesis?.removeEventListener('voiceschanged', update);
-  }, []);
-  useEffect(() => () => { void playback.current?.close(); }, []);
-
-  function respond(message: string) {
-    setReply(message);
-    void speakReply(t(message));
+    if(!open)return;let stop=false;let timer:ReturnType<typeof setTimeout>;const abort=new AbortController();setEngineState('loading');
+    const check=async () => {try {const response=await fetch('/api/ai/speech/status',{signal:abort.signal});if(!response.ok)throw new Error();const data=await response.json();if(!stop){setEngineState(data.state);setCloudSpeech(data.model==='cloud');timer=setTimeout(check,data.state==='ready' ? 20000 : 3000);}}catch{if(!stop){setEngineState('error');timer=setTimeout(check,3000);}}};
+    void check();return () => {stop=true;clearTimeout(timer);abort.abort();};
+  },[open]);
+  function close(){voiceSession.current=false;followup.current=false;input.cancel();output.stop();request.current?.abort();request.current=null;setBusy(false);locked.current=false;setOpen(false);}
+  function respond(message:string,lang:AgentLanguage=language==='auto' ? replyLanguage : language){message=translateReply(message,agentLanguages[lang].base as Language);setReply(message);setReplyLanguage(lang);setHistory(h => [...h,{role:'assistant',text:message}].slice(-20) as AgentMessage[]);void output.speak(message,lang);}
+  function chooseLanguage(value:AgentLanguage){input.cancel();output.stop();setLanguage(value);memory.remember('language',value);const base=agentLanguages[value].base;if(value!=='auto' && Object.hasOwn(LANGUAGE_NAMES,base))setUILanguage(base as Language);}
+  function rememberCommand(value:string):boolean {
+    const instruction=parseMemoryInstruction(value);if(!instruction)return false;
+    if(instruction.action==='forget'){memory.forget(instruction.key);respond('Saved preferences cleared.');return true;}
+    const saved=instruction.action==='remember' && memory.remember(instruction.key,instruction.value);
+    if(saved && instruction.action==='remember' && instruction.key==='language')chooseLanguage(instruction.value as AgentLanguage);
+    respond(saved ? 'Preference saved on this device.' : 'I can only remember language, budget and category preferences.');return true;
   }
-  async function speakReply(message: string, serverOnly = false) {
-    stopSpeaking(); setSpeechError('');
-    const version = speechVersion.current;
-    if (nativeVoice && !serverOnly && window.speechSynthesis) {
-      const utterance = new SpeechSynthesisUtterance(message);
-      utterance.lang = speechLocales[language]; utterance.voice = nativeVoice;
-      utterance.onend = () => { if (version === speechVersion.current) continueListening.current(); };
-      utterance.onerror = event => { if (!['interrupted','canceled'].includes(event.error) && version === speechVersion.current) void speakReply(message,true); };
-      window.speechSynthesis.speak(utterance); return;
-    }
+  async function handleText(value:string,confident=true,override?:Record<string,any>,detected?:AgentLanguage){
+    if(locked.current || !value.trim())return;setError('');setText('');
+    const messages=[...history,{role:'user',text:value}] as AgentMessage[];setHistory(messages.slice(-20));
+    if(rememberCommand(value))return;
+    if(/^(cancel|no|stop|না|বাতিল|रद्द|नहीं)[.!\s]*$/iu.test(value)){setDraft(null);setPending(null);task.current.draft=undefined;followup.current=false;respond('Cancelled');return;}
+    locked.current=true;setBusy(true);output.stop();
+    const controller=new AbortController();request.current=controller;const timer=setTimeout(() => controller.abort(new DOMException('Timed out','TimeoutError')),45000);
     try {
-      speechRequest.current = new AbortController();
-      const response = await fetch('/api/ai/speak', { method:'POST', signal:speechRequest.current.signal,
-        headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ text:message.slice(0,1000), language }) });
-      if (!response.ok) throw new Error('Speech playback failed');
-      const audio = await response.arrayBuffer();
-      if (version !== speechVersion.current) return;
-      unlockSpeaker();
-      const decoded = await playback.current!.decodeAudioData(audio);
-      if (version !== speechVersion.current) return;
-      const source = playback.current!.createBufferSource(); source.buffer = decoded;
-      source.onended = () => { if (version === speechVersion.current) continueListening.current(); };
-      source.connect(playback.current!.destination); speaker.current = source; source.start();
-    } catch (error) {
-      if (version === speechVersion.current && (error as Error).name !== 'AbortError') setSpeechError('Could not play spoken reply. Tap replay to try again.');
-    }
-  }
-  async function saveDraft() {
-    const product = draftRef.current;
-    if (!product || user?.role !== 'manager' || !token) { respond('There is no product waiting for confirmation.'); return; }
-    if (!productComplete(product)) { respond(parseNativeCommand('',user.role,product).message); return; }
-    if (locked.current) return;
-    locked.current = true; setBusy(true);
-    try {
-      const response = await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(product) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Could not create product');
-      setDraft(null); draftRef.current = null;
-      window.dispatchEvent(new Event('products-updated'));
-      navigate('/manager'); respond('Product saved successfully.');
-    } catch (error) { respond(error instanceof Error ? error.message : 'Could not create product'); }
-    finally { locked.current = false; setBusy(false); }
-  }
-  async function execute(intent: VoiceIntent, confident = true) {
-    if (intent.action === 'confirm') { await saveDraft(); return; }
-    if (intent.action === 'cancel') { setDraft(null); draftRef.current = null; respond('Cancelled'); return; }
-    if (intent.action === 'create_product') {
-      setDraft(intent.data!); draftRef.current = intent.data!;
-      followup.current = !productComplete(intent.data);
-      if (autoSave && confident && productComplete(intent.data)) { await saveDraft(); return; }
-    }
-    if (intent.action === 'search_product' || intent.action === 'navigate') { setDraft(null); draftRef.current = null; }
-    if (intent.action === 'search_product') navigate(`/marketplace?search=${encodeURIComponent(intent.data!.search)}`);
-    if (intent.action === 'navigate') navigate(intent.data!.path);
-    if (intent.action === 'website_control') {
-      const command = intent.data!.command;
-      if (command === 'scroll_down' || command === 'scroll_up') window.scrollBy({ top:(command === 'scroll_down' ? 1 : -1) * window.innerHeight * 0.8, behavior:'smooth' });
-      if (command === 'back') navigate(-1);
-      if (command === 'read') {
-        const content = document.querySelector('main')?.textContent?.trim().slice(0,800);
-        if (content) { setReply('Reading this page'); void speakReply(content); return; }
+      const reviewing=override || (/^(yes|confirm|save|হ্যাঁ|নিশ্চিত|हाँ|हां|ஆம்|అవును|होय|હા)[.!।\s]*$/iu.test(value) && draft ? draft : undefined);
+      const body={message:reviewing ? `add product name ${reviewing.name}, price ${reviewing.price}, quantity ${reviewing.quantity}` : value,language:language==='auto' && detected?detected:language,history:messages.slice(-10),context:{...getWebsiteContext(),recentItems:task.current.items,search:task.current.search,draft:reviewing || task.current.draft},pending:pending?.id,autoSave:reviewing ? true : autoSave,confident,preferences:memory.enabled ? {budget:memory.budget,category:memory.category} : {}};
+      const response=await fetch('/api/agent/message',{method:'POST',headers:{'Content-Type':'application/json',...(token ? {Authorization:`Bearer ${token}`} : {})},body:JSON.stringify(body),signal:controller.signal});
+      const result:AgentResult=await response.json();if(!response.ok || !result.reply)throw new Error((result as any).message || 'The assistant could not finish this request. Please try again.');
+      if(!alive.current || controller.signal.aborted)return;
+      setDraft(result.draft || null);setPending(result.pending || null);task.current.draft=result.draft;
+      if(result.items)task.current.items=result.items;if(result.search)task.current.search=result.search;
+      followup.current=!!result.draft && !productComplete(result.draft);
+      for(const action of result.actions){
+        if(action.type==='navigate' && action.path && /^\/(?!\/)/.test(action.path))navigate(action.path);
+        if(action.type==='refresh'){window.dispatchEvent(new Event('products-updated'));window.dispatchEvent(new Event('requests-updated'));window.dispatchEvent(new Event('account-updated'));}
+        if(action.type==='website_control'){
+          if(action.command==='back')navigate(-1);
+          if(['scroll_down','scroll_up'].includes(action.command))window.scrollBy({top:window.innerHeight*(action.command==='scroll_down' ? 0.8 : -0.8),behavior:'smooth'});
+          if(action.command==='read'){const content=document.querySelector('main')?.textContent?.trim().slice(0,800);if(content){result.reply=content;if(agentLanguages[result.language].base!==currentLang){const translation=await fetch('/api/ai/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:content,sourceLang:'auto',targetLang:agentLanguages[result.language].base}),signal:controller.signal});if(!translation.ok)throw new Error('Could not play spoken reply. Tap replay to try again.');result.reply=(await translation.json()).translatedText;}}}
+        }
       }
-    }
-    respond(intent.message);
+      respond(result.reply,result.language);
+    }catch(e){if(alive.current && (!controller.signal.aborted || controller.signal.reason?.name==='TimeoutError')){followup.current=false;setError(controller.signal.reason?.name==='TimeoutError' ? 'The assistant request timed out. Please try again.' : (e as Error).name==='TypeError'?'The assistant could not finish this request. Please try again.':(e as Error).message);}}
+    finally{clearTimeout(timer);if(request.current===controller){locked.current=false;if(alive.current)setBusy(false);}}
   }
-  async function handleText(value: string, confident = true) {
-    if (!value.trim()) { respond('No speech detected. Please try again.'); return; }
-    setTranscript(value); setText('');
-    await execute(parseNativeCommand(value, user?.role, draftRef.current), confident);
-  }
-  async function stopPcm(id: number) {
-    const capture = pcm.current; pcm.current = null;
-    if (!capture) return;
-    setRecording(false); setBusy(true); locked.current = true;
-    try {
-      const audio = await capture.stop();
-      const form = new FormData(); form.append('audio', audio, 'recording.wav'); form.append('language', language);
-      controller.current = new AbortController();
-      const timeout = setTimeout(() => controller.current?.abort(), 300000);
-      let response: Response;
-      try { response = await fetch('/api/ai/transcribe-and-intent', { method: 'POST', body: form, signal: controller.current.signal, headers: token ? { Authorization: `Bearer ${token}` } : {} }); }
-      finally { clearTimeout(timeout); }
-      const data = await response.json();
-      if (id !== session.current) return;
-      if (!response.ok) throw new Error(data.message || 'Speech service unavailable. You can type your command.');
-      locked.current = false; setBusy(false);
-      await handleText(data.transcript);
-    } catch (error) { if (id === session.current) respond(error instanceof Error && error.name !== 'AbortError' ? error.message : 'Speech service unavailable. You can type your command.'); }
-    finally { if (id === session.current) { setBusy(false); locked.current = false; } }
-  }
-  async function toggleRecording() {
-    setOpen(true);
-    unlockSpeaker();
-    if (recording) {
-      if (timer.current) clearTimeout(timer.current);
-      if (recognition.current) recognition.current.stop();
-      else if (pcm.current) await stopPcm(session.current);
-      return;
-    }
-    if (locked.current) return;
-    locked.current = true; stopSpeaking();
-    const id = ++session.current;
-    setTranscript('');
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error('Microphone requires a supported browser and HTTPS.');
-      const capture = await startPcmRecording(() => {
-        if (id !== session.current) return;
-        if (recognition.current) recognition.current.stop();
-        else void stopPcm(id);
-      });
-      if (id !== session.current) { capture.cancel(); return; }
-      pcm.current = capture; setRecording(true);
-    } catch (error) {
-      locked.current = false;
-      respond('Microphone permission denied. Allow microphone access in your browser.'); return;
-    }
-    const Constructor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (Constructor) {
-      const instance: Recognition = new Constructor(); recognition.current = instance;
-      instance.lang = speechLocales[language]; instance.continuous = false; instance.interimResults = true;
-      let final = ''; let failed = false; let confident = true;
-      instance.onresult = event => {
-        let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            final += ' ' + event.results[i][0].transcript;
-            const confidence = event.results[i][0].confidence;
-            if (typeof confidence === 'number' && confidence < 0.7) confident = false;
-          }
-          else interim += event.results[i][0].transcript;
-        }
-        if (id === session.current) setTranscript(final || interim);
-      };
-      instance.onerror = event => {
-        failed = true;
-        if (id !== session.current) return;
-        // Keep the PCM recording alive; the browser service is optional.
-        recognition.current = null;
-        setReply('Listening...');
-      };
-      instance.onend = () => {
-        if (id !== session.current) return;
-        if (timer.current) clearTimeout(timer.current);
-        recognition.current = null; locked.current = false;
-        if (!failed && final.trim()) {
-          pcm.current?.cancel(); pcm.current = null; setRecording(false);
-          void handleText(final.trim(), confident);
-        } else if (pcm.current) {
-          // A service error can arrive before the user starts speaking.
-          // Leave recording active until silence detection or a second tap.
-          if (!failed) void stopPcm(id);
-          else timer.current = setTimeout(() => void stopPcm(id),30000);
-        }
-      };
-      try { instance.start(); setRecording(true); timer.current = setTimeout(() => instance.stop(), 30000); }
-      catch { recognition.current = null; locked.current = false; timer.current = setTimeout(() => void stopPcm(id),30000); }
-    } else { locked.current = false; timer.current = setTimeout(() => void stopPcm(id),30000); }
-  }
-  async function startFallback() {
-    if (locked.current || recording) return;
-    locked.current = true; setOpen(true);
-    unlockSpeaker(); stopSpeaking();
-    const id = ++session.current;
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error('Microphone requires a supported browser and HTTPS.');
-      const capture = await startPcmRecording(() => { if (id === session.current) void stopPcm(id); });
-      if (id !== session.current) { capture.cancel(); return; }
-      pcm.current = capture; setRecording(true);
-      timer.current = setTimeout(() => void stopPcm(id), 30000);
-    } catch (error) { respond(error instanceof Error ? error.message : 'Could not access microphone'); }
-    finally { if (id === session.current) locked.current = false; }
-  }
-  return <aside className="fixed bottom-6 right-4 sm:right-6 z-50">
-    {open && <section aria-label={t('Voice Assistant')} className="mb-3 w-[min(360px,calc(100vw-32px))] rounded-2xl bg-[#1E293B] border border-[#334155] p-4 shadow-2xl space-y-3 text-white">
-      <div className="flex justify-between items-center"><h2 className="font-bold">{t('Voice Assistant')} · {LANGUAGE_NAMES[language]}</h2><button aria-label={t('Close')} onClick={() => { cancelCapture(); setRecording(false); setBusy(false); setOpen(false); }}><X size={18}/></button></div>
-      <p role="status" className="text-sm text-emerald-300">{t(recording ? 'Listening...' : busy ? 'Processing...' : reply)}</p>
-      {engineState === 'loading' && <p className="text-xs text-slate-300">{t('Preparing local speech recognition...')}</p>}
-      {engineState === 'error' && <p className="text-xs text-amber-300">{t('Local speech engine is unavailable. Check that the backend server is running.')}</p>}
-      {transcript && <p className="text-sm break-words"><strong>{t('You said:')}</strong> {transcript}</p>}
-      {speechError && <p role="alert" className="text-xs text-amber-300">{t(speechError)}</p>}
-      <button aria-label={t('Replay reply')} onClick={() => { unlockSpeaker(); void speakReply(t(reply)); }} className="flex gap-2 items-center text-xs"><Volume2 size={16}/>{t('Replay reply')}</button>
-      {user?.role === 'manager' && <label className="flex gap-2 items-center text-xs"><input type="checkbox" checked={autoSave} onChange={event => setAutoSave(event.target.checked)}/>{t('Save complete products automatically')}</label>}
-      {draft && <div className="rounded-lg bg-slate-900 p-3 text-sm space-y-2">
-        {(['name','price','quantity'] as const).map(field => <label key={field} className="flex items-center gap-2"><span className="w-20">{t(field === 'name' ? 'Product Name' : field === 'price' ? 'Price' : 'Quantity')}</span><input aria-label={t(field === 'name' ? 'Product Name' : field === 'price' ? 'Price' : 'Quantity')} type={field === 'name' ? 'text' : 'number'} min={field === 'name' ? undefined : 0.01} step="any" value={draft[field] ?? ''} className="min-w-0 w-full rounded bg-slate-800 px-2 py-1" onChange={event => { const next = { ...draft, [field]:field === 'name' ? event.target.value : Number(event.target.value) }; if (field === 'price') next.actualPrice=next.price; setDraft(next); draftRef.current=next; }}/></label>)}
-        <div className="flex gap-3"><button disabled={busy || !productComplete(draft)} className="bg-emerald-600 rounded px-3 py-2 disabled:opacity-50" onClick={saveDraft}>{t('Confirm')}</button><button onClick={() => { setDraft(null); draftRef.current = null; respond('Cancelled'); }}>{t('Cancel')}</button></div>
-      </div>}
-      <form className="flex gap-2" onSubmit={event => { event.preventDefault(); unlockSpeaker(); if (!busy && !recording) void handleText(text); }}>
-        <input aria-label={t('Type a command')} placeholder={t('Type a command')} value={text} onChange={event => setText(event.target.value)} className="min-w-0 flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm"/>
-        <button aria-label={t('Send')} disabled={busy || recording} className="p-2 bg-emerald-600 rounded-lg"><Send size={18}/></button>
-      </form>
-      <button disabled={busy || recording} onClick={startFallback} className="text-xs underline">{t('Use audio fallback')}</button>
-    </section>}
-    <button onClick={toggleRecording} disabled={busy} aria-label={t(recording ? 'Stop Recording' : 'Speak to Agent')} className={`ml-auto w-14 h-14 rounded-full flex items-center justify-center shadow-xl text-white ${recording ? 'bg-red-500 animate-pulse' : 'bg-emerald-600'} disabled:opacity-50`}>
-      {busy ? <Loader2 className="animate-spin"/> : recording ? <MicOff/> : <Mic/>}
-    </button>
+  function startVoice(serverOnly=false){setOpen(true);setError('');voiceSession.current=true;output.unlock();output.stop();if(input.listening){voiceSession.current=false;input.stop();}else void input.start(serverOnly);}
+  const status=input.listening ? 'Listening...' : input.processing || busy ? 'Processing...' : output.speaking ? 'Speaking...' : error || output.error ? 'Try again' : 'Ready to help';
+  return <aside className="voice-dock" aria-label={t('Voice Assistant')}>
+    <AnimatePresence>{open && <motion.section initial={{opacity:0,y:18,scale:0.97}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:12,scale:0.97}} id="voice-assistant-panel" className="agent-panel" aria-label={t('Voice Assistant')}>
+      <div className="agent-header"><div className="agent-emblem"><Sparkles size={20}/></div><div className="flex-1"><h2>{t('Voice Assistant')}</h2><p className="agent-status" role="status"><span className={input.listening ? 'status-dot listening' : 'status-dot'}/>{t(status)}</p></div><button className="icon-button" aria-label={t('Close')} onClick={close}><X size={18}/></button></div>
+      <div className="agent-language"><label htmlFor="agent-language">{t('Language')}</label><select id="agent-language" aria-label={t('Assistant language')} value={language} onChange={e => chooseLanguage(e.target.value as AgentLanguage)}>{Object.entries(agentLanguages).map(([key,value]) => <option key={key} value={key}>{key==='auto'?t('Auto Detect'):value.name}</option>)}</select></div>
+      <div ref={scroll} className="agent-conversation" role="log" aria-live="polite" aria-relevant="additions">
+        {history.length===0 && <div className="agent-welcome"><div className="voice-orb"><Mic size={27}/></div><h3>{t('How can I help?')}</h3><p>{t('Ask me to search products, open your dashboard or requests, or add a product.')}</p><div className="agent-suggestions">{['Explore Marketplace','My Requests'].map(label => <button key={label} onClick={() => void handleText(label==='My Requests' ? 'show my requests' : 'open marketplace')}>{t(label)}</button>)}</div></div>}
+        {history.map((message,index) => <div className={`chat-message ${message.role}`} key={index}><span>{message.role==='user' ? t('You said:') : t('Voice Assistant')}</span><p dir="auto" lang={agentLanguages[detectAgentLanguage(message.text)].base}>{message.text}</p></div>)}
+        {input.listening && <div className="transcript-live"><div className="voice-bars">{[0,1,2,3,4].map(n => <i key={n} style={{animationDelay:`${n*0.12}s`}}/>)}</div><p>{input.transcript || t('Listening...')}</p></div>}
+        {engineState==='loading' && <p className="agent-note">{t('Preparing local speech recognition...')}</p>}
+        {engineState==='error' && <p className="agent-note">{t('Local speech engine is unavailable. Check that the backend server is running.')}</p>}
+        {(error || output.error) && <p className="agent-error" role="alert">{t(error || output.error)}</p>}
+        {draft && <div className="agent-draft">{(['name','price','quantity'] as const).map(field => <label key={field}>{t(field==='name' ? 'Product Name' : field==='price' ? 'Price' : 'Quantity')}<input aria-label={t(field==='name' ? 'Product Name' : field==='price' ? 'Price' : 'Quantity')} type={field==='name' ? 'text' : 'number'} min={field==='name' ? undefined : field==='quantity'?1:0.01} step={field==='quantity'?'1':'any'} value={draft[field] ?? ''} onChange={e => setDraft({...draft,[field]:field==='name' ? e.target.value : Number(e.target.value)})}/></label>)}<div className="flex gap-2"><button className="button-primary" disabled={busy || !productComplete(draft)} onClick={() => void handleText('confirm',true,draft)}>{t('Confirm')}</button><button className="button-secondary" onClick={() => void handleText('cancel')}>{t('Cancel')}</button></div></div>}
+        {pending && <div className="agent-draft"><p>{reply}</p><div className="flex gap-2"><button className="button-primary" disabled={busy} onClick={() => void handleText('confirm')}>{t('Confirm')}</button><button className="button-secondary" onClick={() => void handleText('cancel')}>{t('Cancel')}</button></div></div>}
+        {showMemory && <div className="agent-draft"><h3>{t('Saved preferences')}</h3><label className="flex gap-2"><input type="checkbox" checked={memory.enabled} onChange={e => memory.setEnabled(e.target.checked)}/>{t('Enable memory')}</label>{(['language','budget','category'] as const).filter(key => memory[key]!==undefined).map(key => <div className="flex justify-between items-center" key={key}><span>{t(key==='language'?'Language':key==='budget'?'Budget':'Category')}: {key==='language'?agentLanguages[memory.language!].name:key==='category'?t(memory.category!):String(memory.budget)}</span><button className="icon-button" aria-label={t('Forget preference')} onClick={() => memory.forget(key)}><Trash2 size={14}/></button></div>)}<button className="button-secondary" onClick={() => memory.forget()}>{t('Clear memories')}</button></div>}
+      </div>
+      <div className="agent-toolbar"><button className="icon-button" aria-label={t(output.muted ? 'Unmute' : 'Mute')} onClick={() => output.setMuted(!output.muted)}>{output.muted ? <VolumeX size={16}/> : <Volume2 size={16}/>}</button><button className="icon-button" aria-label={t('Replay reply')} onClick={() => {output.unlock();void output.speak(reply,replyLanguage);}}><MessageCircle size={16}/></button><button className="icon-button" aria-label={t('Stop speaking')} onClick={output.stop}><Square size={14}/></button><button className="icon-button" aria-label={t('Saved preferences')} onClick={() => setShowMemory(!showMemory)}><Brain size={16}/></button><button className="icon-button ml-auto" aria-label={t('Clear conversation')} onClick={() => {input.cancel();output.stop();setHistory([]);setDraft(null);setPending(null);task.current={};voiceSession.current=false;}}><Trash2 size={16}/></button></div>
+      {user?.role==='manager' && <label className="agent-autosave"><input type="checkbox" checked={autoSave} onChange={e => setAutoSave(e.target.checked)}/>{t('Save complete products automatically')}</label>}
+      <form className="agent-composer" onSubmit={e => {e.preventDefault();output.unlock();if(!busy && !input.listening)void handleText(text);}}><input aria-label={t('Type a command')} placeholder={t('Type a command')} value={text} onChange={e => setText(e.target.value)} maxLength={1500}/><button type="button" className={`icon-button ${input.listening ? 'recording' : ''}`} disabled={busy || input.processing} aria-label={t(input.listening ? 'Stop Recording' : 'Speak to Agent')} onClick={() => startVoice()}>{input.listening ? <MicOff size={19}/> : <Mic size={19}/>}</button><button className="agent-send" aria-label={t('Send')} disabled={busy || input.listening || !text.trim()}>{busy ? <Loader2 className="animate-spin" size={18}/> : <Send size={18}/>}</button></form>
+      <div className="agent-footer"><ShieldCheck size={12}/><span title={cloudSpeech?t('Audio is sent to the speech provider'):undefined}>{t(cloudSpeech?'Audio is sent to the speech provider':'Audio is not saved')}</span><button disabled={busy || input.listening} onClick={() => startVoice(true)}>{t('Use audio fallback')}</button></div>
+    </motion.section>}</AnimatePresence>
+    <button aria-expanded={open} aria-controls="voice-assistant-panel" className={`agent-launcher ${input.listening ? 'recording' : ''}`} disabled={busy || input.processing} aria-label={t(open ? 'Close' : 'Voice Assistant')} onClick={() => open ? close() : startVoice()}>{busy || input.processing ? <Loader2 className="animate-spin"/> : open ? <ChevronDown/> : <Sparkles/>}<span>{t('Voice Assistant')}</span><span className="launcher-mic"><Mic size={16}/></span></button>
   </aside>;
 }

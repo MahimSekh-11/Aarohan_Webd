@@ -3,19 +3,23 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "engines": { "node": "22.x" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "concurrently \"tsx watch server.ts\" \"vite --open\"",
     "build": "vite build && node scripts/build-server.mjs",
     "vercel-build": "vite build && node scripts/build-server.mjs --vercel",
-    "start": "node dist/server.mjs",
+    "start": "node build/server.mjs",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "node scripts/clean.mjs",
     "lint": "tsc --noEmit",
-    "test": "tsx --test tests/voice.test.ts tests/audio-server.test.ts tests/synthesis.test.ts && tsx scripts/check-languages.ts",
-    "test:browser": "node tests/browser.mjs",
+    "test": "tsx --test tests/voice.test.ts tests/audio-server.test.ts tests/synthesis.test.ts tests/agent.test.ts && tsx scripts/check-languages.ts",
+    "test:browser": "tsx tests/browser.ts",
     "test:deployment": "npm run vercel-build && node tests/deployment.mjs",
-    "test:speech-http": "esbuild tests/speech-http.ts --bundle --platform=node --format=esm --packages=external --outfile=tests/artifacts/speech-http.mjs && node tests/artifacts/speech-http.mjs"
+    "test:speech-http": "esbuild tests/speech-http.ts --bundle --platform=node --format=esm --packages=external --outfile=tests/artifacts/speech-http.mjs && node tests/artifacts/speech-http.mjs",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "test:agent": "tsx tests/agent.integration.ts"
   },
   "dependencies": {
     "@echogarden/espeak-ng-emscripten": "^0.3.5",

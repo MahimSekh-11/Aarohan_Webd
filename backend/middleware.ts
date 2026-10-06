@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from './models.js';
+declare global { namespace Express { interface Request { user?:any } } }
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -17,6 +18,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
       res.status(401).json({ message: 'User not found' });
       return;
     }
+    if (req.user.status !== 'approved') { res.status(403).json({message:'Your account is not approved.'}); return; }
     next();
   } catch (error) {
     res.status(401).json({ message: 'Invalid token' });

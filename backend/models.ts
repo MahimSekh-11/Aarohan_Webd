@@ -59,6 +59,7 @@ const leadSchema = new Schema({
     }
   },
   status: { type: String, enum: ['new', 'contacted', 'resolved'], default: 'new' },
+  activeKey: {type:String},
   customerDetails: {
     name: String,
     phone: String,
@@ -66,6 +67,7 @@ const leadSchema = new Schema({
   }
 }, { timestamps: true });
 
+leadSchema.index({ activeKey:1 },{unique:true,sparse:true});
 leadSchema.index({ customer: 1 });
 leadSchema.index({ manager: 1 });
 leadSchema.index({ status: 1 });
@@ -96,6 +98,16 @@ const notificationSchema = new Schema({
 notificationSchema.index({ recipient: 1, read: 1 });
 
 export const Notification = mongoose.model('Notification', notificationSchema);
+
+// Only pending, explicitly confirmed actions persist, for five minutes. Raw
+// audio and conversation histories are never saved to MongoDB.
+const agentActionSchema = new Schema({
+  _id:{type:String,required:true}, userId:{type:Schema.Types.ObjectId,ref:'User',required:true},
+  name:{type:String,required:true}, args:{type:Schema.Types.Mixed,required:true},
+  consumed:{type:Boolean,default:false}, expiresAt:{type:Date,required:true},
+});
+agentActionSchema.index({expiresAt:1},{expireAfterSeconds:0});
+export const AgentAction = mongoose.model('AgentAction',agentActionSchema);
 
 // Mock DB state array to gracefully handle missing MongoDB connection
 export const MOCK_DB = {

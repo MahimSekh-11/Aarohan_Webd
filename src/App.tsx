@@ -1,16 +1,18 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, lazy, Suspense } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import Navbar from './components/Navbar';
-import Marketplace from './pages/Marketplace';
-import Login from './pages/Login';
-import AdminLogin from './pages/AdminLogin';
-import Register from './pages/Register';
-import ManagerDashboard from './pages/ManagerDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import CustomerDashboard from './pages/CustomerDashboard';
+const Marketplace=lazy(()=>import('./pages/Marketplace'));
+const Login=lazy(()=>import('./pages/Login'));
+const AdminLogin=lazy(()=>import('./pages/AdminLogin'));
+const Register=lazy(()=>import('./pages/Register'));
+const ManagerDashboard=lazy(()=>import('./pages/ManagerDashboard'));
+const AdminDashboard=lazy(()=>import('./pages/AdminDashboard'));
+const CustomerDashboard=lazy(()=>import('./pages/CustomerDashboard'));
+const Account=lazy(()=>import('./pages/Account'));
+import { useT } from './components/Translate';
 import Landing from './pages/Landing';
-import VoiceAgent from './components/VoiceAgent';
+const VoiceAgent=lazy(()=>import('./components/VoiceAgent'));
 import { useLanguageStore } from './store/useLanguageStore';
 
 import { NotificationProvider } from './components/NotificationProvider';
@@ -22,15 +24,18 @@ function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: 
   return children;
 }
 
-const RootRedirect = () => {
-  const { user, token } = useAuthStore();
-  if (!token || !user) return <Navigate to="/login" replace />;
-  if (user.role === 'admin') return <Navigate to="/admin" replace />;
-  if (user.role === 'manager') return <Navigate to="/manager" replace />;
-  return <Navigate to="/customer" replace />;
-};
+function Footer(){const t=useT();return <footer className="site-footer w-full"><strong>TIORKHALI MART</strong><span>{t("Developed with passion by")} Mahim Ali Sekh · {t("© 2026 Tiorkhali Mart. All Rights Reserved.")}</span></footer>;}
+function PageRoutes(){
+  const location=useLocation(),t=useT(),language=useLanguageStore(s=>s.currentLang);
+  useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});document.title=`TIORKHALI MART · ${t(location.pathname==='/marketplace'?'Marketplace':location.pathname==='/account'?'Account':location.pathname==='/manager'?'Dashboard':location.pathname==='/admin'?'Admin':location.pathname==='/customer'?'My Requests':location.pathname==='/register'?'Create Account':location.pathname.includes('login')?'LOG IN':'TIORKHALI MART')}`;},[location.pathname,t,language]);
+  return <div className="page-content" key={location.pathname}><Suspense fallback={<div className="card-skeleton my-8"/>}><Routes>
+    <Route path="/" element={<Landing/>}/><Route path="/marketplace" element={<Marketplace/>}/><Route path="/login" element={<Login/>}/><Route path="/register" element={<Register/>}/><Route path="/admin/login" element={<AdminLogin/>}/>
+    <Route path="/account" element={<ProtectedRoute><Account/></ProtectedRoute>}/><Route path="/manager" element={<ProtectedRoute role="manager"><ManagerDashboard/></ProtectedRoute>}/><Route path="/customer" element={<ProtectedRoute role="customer"><CustomerDashboard/></ProtectedRoute>}/><Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard/></ProtectedRoute>}/><Route path="*" element={<Navigate to="/" replace/>}/>
+  </Routes></Suspense></div>;
+}
 
 export default function App() {
+  const t=useT();
   const initialize = useAuthStore((state) => state.initialize);
   const language = useLanguageStore(state => state.currentLang);
 
@@ -43,28 +48,14 @@ export default function App() {
   return (
     <NotificationProvider>
       <Router>
-        <div className="min-h-screen bg-[#0B0F19] text-[#F9FAFB] flex flex-col font-sans selection:bg-[#10B981]/30 selection:text-[#10B981]">
+        <div className="app-shell min-h-screen text-[#F3F6F9] flex flex-col font-sans selection:bg-[#83D9BD]/30 selection:text-[#83D9BD]">
+          <a href="#main-content" className="skip-link">{t('Skip to content')}</a>
           <Navbar />
-          <VoiceAgent />
-          <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/marketplace" element={<Marketplace />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/admin" element={
-                <ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>
-              } />
-              <Route path="/manager" element={
-                <ProtectedRoute role="manager"><ManagerDashboard /></ProtectedRoute>
-              } />
-              <Route path="/customer" element={
-                <ProtectedRoute role="customer"><CustomerDashboard /></ProtectedRoute>
-              } />
-            </Routes>
+          <Suspense fallback={null}><VoiceAgent /></Suspense>
+          <main id="main-content" tabIndex={-1} className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+            <PageRoutes/>
           </main>
+          <Footer/>
         </div>
       </Router>
     </NotificationProvider>

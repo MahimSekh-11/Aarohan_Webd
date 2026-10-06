@@ -41,7 +41,7 @@ export function normalizeSpokenNumbers(input: string) {
   flush(); return output.join(' ').replace(/(\d+)\s+(?:point|decimal|दशमलव|দশমিক)\s+(\d+)/gu,'$1.$2');
 }
 export function productComplete(product?: Record<string,any> | null) {
-  return !!product?.name?.trim() && Number.isFinite(product.price) && product.price > 0 && Number.isFinite(product.quantity) && product.quantity > 0;
+  return !!product?.name?.trim() && Number.isFinite(product.price) && product.price > 0 && Number.isInteger(product.quantity) && product.quantity > 0;
 }
 const pricePattern = /(?:₹|\b(?:for|at|rs\.?|rupees|price|cost)\b|कीमत|दाम|প্রাইস|মূল্য|দাম|விலை|ధర|किंमत|કિંમત)\s*(?:is|to|है|হলো|হবে|[:=])?\s*(\d+(?:\.\d+)?)(?:\s*(?:rupees|rs\b|रुपये|रुपया|টাকা|রুপি|ரூபாய்|రూపాయలు|રૂપિયા))?/iu;
 const quantityPattern = /(?:\b(?:quantity|stock|units)\b|मात्रा|স্টক|সংখ্যা|পরিমাণ|মজুত|அளவு|పరిమాణం|प्रमाण|જથ્થો)\s*(?:is|[:=])?\s*(\d+(?:\.\d+)?)(?:\s*(?:kg|kilos?|kilograms?|pcs|units?|packets?|किलो|কেজি|கிலோ|కిలో|કિલો))?|(?:(\d+(?:\.\d+)?)\s*(?:kg|kilos?|kilograms?|pcs|units?|packets?|किलो|কেজি|கிலோ|కిలో|કિલો))/iu;

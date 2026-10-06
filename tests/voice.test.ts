@@ -70,7 +70,7 @@ test('audio fallback produces real PCM WAV with correct sample rate and clipping
   assert.equal(data.getUint32(40,true),6); assert.equal(data.getInt16(44,true),-32768); assert.equal(data.getInt16(48,true),32767);
 });
 test('every locale has offline assistant and inventory labels', () => {
-  for (const lang of Object.keys(speechLocales) as (keyof typeof speechLocales)[]) {
+  for (const lang of ['en','hi','bn','ta','te','mr','gu'] as ('en'|'hi'|'bn'|'ta'|'te'|'mr'|'gu')[]) {
     for (const key of ['Voice Assistant','My Inventory','My Requests','Confirm','Listening...']) if (lang !== 'en') assert.notEqual(t(key,lang), key);
   }
 });

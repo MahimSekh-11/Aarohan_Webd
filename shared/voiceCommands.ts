@@ -1,6 +1,6 @@
 import { productTerms } from './languages.js';
 import { extractProduct, productComplete } from './productVoice.js';
-export const speechLocales = { en: 'en-IN', hi: 'hi-IN', bn: 'bn-IN', ta: 'ta-IN', te: 'te-IN', mr: 'mr-IN', gu: 'gu-IN' } as const;
+export const speechLocales = { en: 'en-IN', hi: 'hi-IN', bn: 'bn-IN', ta: 'ta-IN', te: 'te-IN', mr: 'mr-IN', gu: 'gu-IN',kn:'kn-IN',ml:'ml-IN',pa:'pa-IN',ur:'ur-PK' } as const;
 export type VoiceLanguage = keyof typeof speechLocales;
 export type VoiceIntent = { action: 'search_product' | 'navigate' | 'website_control' | 'create_product' | 'confirm' | 'cancel' | 'help' | 'unknown'; message: string; data?: Record<string, any> };
 const commands = {

@@ -39,16 +39,5 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('user');
     set({ token: null, user: null });
   },
-  initialize: () => {
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
-    if (token && userStr) {
-      try {
-        set({ token, user: JSON.parse(userStr) });
-      } catch (e) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
-    }
-  }
+  initialize: () => {set(readStoredAuth());}
 }));

@@ -24,10 +24,12 @@ export async function prepareSpeech() { await loadTranscriber(); }
 export const langCodes: Record<string, string> = {
   en: 'eng_Latn', hi: 'hin_Deva', bn: 'ben_Beng', ta: 'tam_Taml',
   te: 'tel_Telu', mr: 'mar_Deva', gu: 'guj_Gujr',
+  kn:'kan_Knda',ml:'mal_Mlym',pa:'pan_Guru',ur:'urd_Arab',
 };
 const speechLanguages: Record<string, string> = {
   en: 'english', hi: 'hindi', bn: 'bengali', ta: 'tamil',
   te: 'telugu', mr: 'marathi', gu: 'gujarati',
+  kn:'kannada',ml:'malayalam',pa:'punjabi',ur:'urdu',
 };
 
 async function loadTranscriber() {
@@ -66,7 +68,7 @@ export function convertAudioBuffer(buffer: Buffer): Float32Array {
 }
 
 export async function transcribeAudio(audioBuffer: Buffer, language = 'en'): Promise<string> {
-  if (!speechLanguages[language]) throw new Error('Unsupported speech language');
+    if (language !== 'auto' && !speechLanguages[language]) throw new Error('Unsupported speech language');
   try {
     const audioData = convertAudioBuffer(audioBuffer);
     if (!audioData.length || audioData.every(sample => Math.abs(sample) < 0.001)) throw new Error('No speech detected. Please try again.');
@@ -75,7 +77,7 @@ export async function transcribeAudio(audioBuffer: Buffer, language = 'en'): Pro
     const run = transcriptionQueue.then(() => transcriber(audioData, {
       chunk_length_s: 30,
       stride_length_s: 5,
-      language: speechLanguages[language],
+      ...(language === 'auto' ? {} : {language:speechLanguages[language]}),
       task: 'transcribe',
       max_new_tokens: 256,
       num_beams: 3,

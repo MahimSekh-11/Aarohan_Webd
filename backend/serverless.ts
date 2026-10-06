@@ -27,7 +27,11 @@ app.get('/api/health', (_req: Request, res: Response) => {
 
 app.use(async (req: Request, res: Response, next: NextFunction) => {
   // Speech must keep working even when MongoDB is unavailable.
-  if (!/^\/api\/(?:auth|admin|products|leads|notifications)(?:\/|$)/.test(req.path)) { next(); return; }
+  if (req.path.startsWith('/api/agent/') && req.path !== '/api/agent/status' && process.env.MONGODB_URI) {
+    try { await connectDB(); } catch { /* The agent returns a polite tool error. */ }
+    next(); return;
+  }
+  if (!/^\/api\/(?:auth|admin|manager|customer|products|leads|notifications)(?:\/|$)/.test(req.path)) { next(); return; }
   try { await connectDB(); next(); }
   catch (error) {
     console.error('Database unavailable:',error instanceof Error ? error.name : 'Connection error');

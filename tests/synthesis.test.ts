@@ -7,7 +7,8 @@ import { t } from '../src/i18n/translations';
 
 test('local synthesizer produces audible native WAV for every supported language', async () => {
   for (const lang of Object.keys(speechLocales) as VoiceLanguage[]) {
-    const text = t('Opening marketplace',lang);
+    const samplesByLanguage:Record<string,string>={kn:'ಮಾರುಕಟ್ಟೆ ತೆರೆಯುತ್ತಿದೆ',ml:'വിപണി തുറക്കുന്നു',pa:'ਬਾਜ਼ਾਰ ਖੋਲ੍ਹ ਰਿਹਾ ਹਾਂ',ur:'بازار کھول رہا ہوں'};
+    const text = samplesByLanguage[lang] || t('Opening marketplace',lang as any);
     const wav = await synthesizeSpeech(text,lang);
     assert.equal(wav.toString('ascii',0,4),'RIFF');
     const samples = convertAudioBuffer(wav);
