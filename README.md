@@ -50,7 +50,8 @@ Instead of introducing complex payment barriers for rural transactions, VillageM
 ## 📂 Project Structure Overview
 
 ```bash
-├── api/                    # Server-side controllers and database adapters
+├── api/index.js            # Vercel entry importing the built serverless handler
+├── backend/                # Server-side controllers and database adapters
 │   ├── middleware.ts       # Unified JSON Web Token (JWT) verification guard
 │   ├── models.ts           # Mongoose Data Schemas (User, Product, Lead)
 │   └── routes.ts           # REST API Endpoint declarations
@@ -75,7 +76,7 @@ Instead of introducing complex payment barriers for rural transactions, VillageM
 ## ⚙️ Direct Setup & Commands
 
 ### Prerequisites
-* **Node.js** Installed (v18+)
+* **Node.js 22** Installed
 * **MongoDB** connection string (or defaults automatically to an in-memory test database)
 
 ### Installation
@@ -94,7 +95,7 @@ Instead of introducing complex payment barriers for rural transactions, VillageM
   ```bash
   npm run dev
   ```
-  Open `http://localhost:3000` to start interacting.
+  Open `http://localhost:5173` to start interacting.
 
 * **Production Compilation**:
   Bundles client assets and transpiles server TypeScript cleanly under `dist/`:
@@ -122,6 +123,14 @@ PORT=3000
 <img width="572" height="1024" alt="image" src="https://github.com/user-attachments/assets/d6cf0f90-f7cd-4215-a815-08e9e1473990" />
 
 *Created with 💜 for rural entrepreneurship and community self-reliance.*
+
+## Vercel deployment
+
+Deploy the repository root with Node.js 22. `vercel.json` sets the Vite preset, `npm run vercel-build`, and the static output directory `dist`. The build creates the private backend bundle `build/serverless.mjs`; `api/index.js` loads that ESM bundle. Backend source lives in `backend/`, so only the actual handler becomes a function. Server code is excluded from public static output. The custom function build follows [Vercel's build-output guidance](https://vercel.com/docs/functions/runtimes/node-js/advanced-node-configuration).
+
+Set `MONGODB_URI` and `JWT_SECRET` in Vercel's Preview and Production environment settings, and allow the deployment to connect to your MongoDB Atlas database. The deployed handler uses the existing database and does not create default administrator accounts during cold starts. After pushing these changes, create a fresh deployment with the build cache disabled once to discard the old compiled `api/index.js`. Visit `/api/health`; `status: "ok"` confirms that the function loads and `configured: true` confirms that both required environment variables are present. A real catalog request is needed to verify database connectivity.
+
+`npm run test:deployment` creates the deployment build, then runs its exact entry with plain Node, checks native WAV replies in all seven languages, and tests database connection concurrency and failures without touching a real database. Model caches use the writable temporary directory on Vercel. Model downloads still need network access, memory and enough request time; the large NLLB translation model can exceed [serverless filesystem limits](https://vercel.com/docs/functions/runtimes), so use a persistent backend for that model in production. Bundled interface translations and native reply synthesis do not need a model download.
 
 ## Languages and voice assistant
 

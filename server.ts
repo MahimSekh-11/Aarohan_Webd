@@ -5,8 +5,8 @@ import path from 'path';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import dns from 'dns';
-import { apiRouter } from './api/routes.js';
-import { User } from './api/models.js';
+import { apiRouter } from './backend/routes.js';
+import { User } from './backend/models.js';
 import bcrypt from 'bcryptjs';
 
 // Programmatically resolve querySrv DNS issues on cloud environments like Render

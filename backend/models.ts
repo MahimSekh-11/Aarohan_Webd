@@ -14,7 +14,6 @@ const userSchema = new Schema({
 
 userSchema.index({ role: 1 });
 userSchema.index({ status: 1 });
-userSchema.index({ phone: 1 });
 
 export const User = mongoose.model('User', userSchema);
 

@@ -1,12 +1,14 @@
 import { pipeline, env } from '@xenova/transformers';
 import wavefile from 'wavefile';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 const { WaveFile } = wavefile;
 
 // Disable local models loading from an absolute path (forces download from HuggingFace to cache)
 env.allowLocalModels = false;
 env.useBrowserCache = false; // We are in node
 if (process.env.VERCEL) {
-  env.cacheDir = '/tmp/.cache';
+  env.cacheDir = join(tmpdir(), 'aarohan-ai-cache');
 }
 
 let transcriber: any = null;

@@ -1,6 +1,6 @@
 import express from 'express';
 import assert from 'node:assert/strict';
-import { apiRouter } from '../api/routes';
+import { apiRouter } from '../backend/routes.js';
 const app = express(); app.use(express.json()); app.use('/api', apiRouter);
 const server = app.listen(0, '127.0.0.1');
 await new Promise<void>(resolve => server.once('listening',resolve));

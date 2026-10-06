@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { synthesizeSpeech } from '../api/speechSynthesis';
-import { convertAudioBuffer } from '../api/aiService';
+import { synthesizeSpeech } from '../backend/speechSynthesis.js';
+import { convertAudioBuffer } from '../backend/aiService.js';
 import { speechLocales, type VoiceLanguage, parseNativeCommand } from '../shared/voiceCommands';
 import { t } from '../src/i18n/translations';
 

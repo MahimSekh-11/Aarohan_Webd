@@ -1,7 +1,16 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "{build/serverless.mjs,node_modules/@echogarden/espeak-ng-emscripten/espeak-ng.data}",
+      "excludeFiles": "{node_modules/@xenova/transformers/.cache/**,node_modules/onnxruntime-node/bin/napi-v3/{darwin,win32}/**,tests/**}",
+      "maxDuration": 300
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",

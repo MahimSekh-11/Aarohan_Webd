@@ -349,7 +349,13 @@ apiRouter.put('/notifications/:id/read', authMiddleware, async (req: Request, re
 apiRouter.get('/ai/speech/status', async (_req: Request, res: Response): Promise<void> => {
   try {
     const { getSpeechStatus, prepareSpeech } = await import('./aiService.js');
-    if (['idle','error'].includes(getSpeechStatus().state)) void prepareSpeech().catch(error => console.error('Speech preparation failed:',error));
+    if (process.env.VERCEL && getSpeechStatus().state !== 'ready') {
+      // Serverless instances may suspend after the response; finish preparation
+      // within this request rather than relying on a background download.
+      await prepareSpeech();
+    } else if (['idle','error'].includes(getSpeechStatus().state)) {
+      void prepareSpeech().catch(error => console.error('Speech preparation failed:',error));
+    }
     res.json(getSpeechStatus());
   } catch (error) { console.error(error); res.status(503).json({ state:'error' }); }
 });

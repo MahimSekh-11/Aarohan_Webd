@@ -52,6 +52,7 @@ export default function VoiceAgent() {
   const [engineState, setEngineState] = useState('idle');
   useEffect(() => {
     if (!open) return;
+    setEngineState('loading');
     const abort = new AbortController(); let stopped = false;
     let next: ReturnType<typeof setTimeout>;
     async function check() {

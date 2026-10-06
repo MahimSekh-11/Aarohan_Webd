@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { encodeWav } from '../src/lib/audio';
-import { convertAudioBuffer, transcribeAudio } from '../api/aiService';
+import { convertAudioBuffer, transcribeAudio } from '../backend/aiService.js';
 
 test('browser PCM WAV decodes on the server into normalized 16kHz float audio', async () => {
   const samples = new Float32Array(32000);
