@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { User } from './models';
+import { User } from './models.js';
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {

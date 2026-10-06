@@ -1,6 +1,6 @@
 import EspeakInitializer from '@echogarden/espeak-ng-emscripten';
-import { encodeWav } from '../src/lib/audio';
-import { speechLocales, type VoiceLanguage } from '../shared/voiceCommands';
+import { encodeWav } from '../src/lib/audio.js';
+import { speechLocales, type VoiceLanguage } from '../shared/voiceCommands.js';
 
 let initializing: Promise<any> | undefined;
 let queue: Promise<unknown> = Promise.resolve();

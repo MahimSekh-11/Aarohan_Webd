@@ -2,8 +2,8 @@ import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
-import { apiRouter } from './routes';
-import { User } from './models';
+import { apiRouter } from './routes.js';
+import { User } from './models.js';
 import bcrypt from 'bcryptjs';
 
 const app = express();

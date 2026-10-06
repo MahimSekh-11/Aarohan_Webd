@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User, Product, Lead } from './models';
-import { authMiddleware, requireRole } from './middleware';
+import { User, Product, Lead } from './models.js';
+import { authMiddleware, requireRole } from './middleware.js';
 
 import multer from 'multer';
-import { parseNativeCommand } from '../shared/voiceCommands';
-import { detectTextLanguage, expandProductSearch } from '../shared/languages';
+import { parseNativeCommand } from '../shared/voiceCommands.js';
+import { detectTextLanguage, expandProductSearch } from '../shared/languages.js';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 export const apiRouter = Router();
@@ -218,7 +218,7 @@ apiRouter.post('/leads', authMiddleware, requireRole(['customer']), async (req: 
     });
 
     // Notify Manager about new lead
-    await import('./models').then(({ Notification }) => {
+    await import('./models.js').then(({ Notification }) => {
       Notification.create({
         recipient: product.managerId,
         message: `New interest from ${req.user.name} for ${product.name}.`
@@ -282,7 +282,7 @@ apiRouter.put('/leads/:id/status', authMiddleware, requireRole(['manager']), asy
   }
 
   // Notify Customer about status update
-  await import('./models').then(({ Notification }) => {
+  await import('./models.js').then(({ Notification }) => {
     Notification.create({
       recipient: lead.customer,
       message: `Your request for ${(lead.product as any)?.name || 'a product'} was marked as ${status}.`
@@ -295,7 +295,7 @@ apiRouter.put('/leads/:id/status', authMiddleware, requireRole(['manager']), asy
 // --- Reviews Routes ---
 apiRouter.get('/products/:id/reviews', async (req: Request, res: Response) => {
   try {
-    const { Review } = await import('./models');
+    const { Review } = await import('./models.js');
     const reviews = await Review.find({ product: req.params.id }).sort({ createdAt: -1 });
     res.json(reviews);
   } catch (err: any) {
@@ -306,7 +306,7 @@ apiRouter.get('/products/:id/reviews', async (req: Request, res: Response) => {
 apiRouter.post('/products/:id/reviews', authMiddleware, requireRole(['customer']), async (req: Request, res: Response): Promise<void> => {
   try {
     const { rating, text } = req.body;
-    const { Review } = await import('./models');
+    const { Review } = await import('./models.js');
     const review = await Review.create({
       product: req.params.id,
       customer: req.user._id,
@@ -323,7 +323,7 @@ apiRouter.post('/products/:id/reviews', authMiddleware, requireRole(['customer']
 // --- Notifications Routes ---
 apiRouter.get('/notifications', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { Notification } = await import('./models');
+    const { Notification } = await import('./models.js');
     const notifications = await Notification.find({ recipient: req.user._id }).sort({ createdAt: -1 }).limit(20);
     res.json(notifications);
   } catch (err: any) {
@@ -333,7 +333,7 @@ apiRouter.get('/notifications', authMiddleware, async (req: Request, res: Respon
 
 apiRouter.put('/notifications/:id/read', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { Notification } = await import('./models');
+    const { Notification } = await import('./models.js');
     const notification = await Notification.findOneAndUpdate(
       { _id: req.params.id, recipient: req.user._id },
       { read: true },
@@ -348,7 +348,7 @@ apiRouter.put('/notifications/:id/read', authMiddleware, async (req: Request, re
 // --- Local AI Routes ---
 apiRouter.get('/ai/speech/status', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const { getSpeechStatus, prepareSpeech } = await import('./aiService');
+    const { getSpeechStatus, prepareSpeech } = await import('./aiService.js');
     if (['idle','error'].includes(getSpeechStatus().state)) void prepareSpeech().catch(error => console.error('Speech preparation failed:',error));
     res.json(getSpeechStatus());
   } catch (error) { console.error(error); res.status(503).json({ state:'error' }); }
@@ -357,11 +357,11 @@ apiRouter.get('/ai/speech/status', async (_req: Request, res: Response): Promise
 apiRouter.post('/ai/speak', async (req: Request, res: Response): Promise<void> => {
   try {
     const { text, language = 'en' } = req.body;
-    const { speechLocales } = await import('../shared/voiceCommands');
+    const { speechLocales } = await import('../shared/voiceCommands.js');
     if (typeof text !== 'string' || !text.trim() || text.length > 1000 || !Object.hasOwn(speechLocales, language)) {
       res.status(400).json({ message: 'Invalid speech text or language' }); return;
     }
-    const { synthesizeSpeech } = await import('./speechSynthesis');
+    const { synthesizeSpeech } = await import('./speechSynthesis.js');
     const audio = await synthesizeSpeech(text, language);
     res.set({ 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store' }).send(audio);
   } catch (error) {
@@ -378,7 +378,7 @@ apiRouter.post('/ai/transcribe-and-intent', upload.single('audio'), async (req: 
     }
 
     // 1. Transcribe audio to text locally
-    const { transcribeAudio, langCodes } = await import('./aiService');
+    const { transcribeAudio, langCodes } = await import('./aiService.js');
     const language = req.body.language || 'en';
     if (!langCodes[language]) { res.status(400).json({ message: 'Unsupported language' }); return; }
     if (req.file.buffer.toString('ascii', 0, 4) !== 'RIFF' || req.file.buffer.toString('ascii', 8, 12) !== 'WAVE') {
@@ -404,7 +404,7 @@ apiRouter.post('/ai/translate', async (req: Request, res: Response): Promise<voi
       return;
     }
     
-    const { translateText, langCodes } = await import('./aiService');
+    const { translateText, langCodes } = await import('./aiService.js');
     if ((sourceLang !== 'auto' && !langCodes[sourceLang]) || !langCodes[targetLang] ||
       !(typeof text === 'string' || (Array.isArray(text) && text.length <= 100 && text.every(t => typeof t === 'string')))) {
       res.status(400).json({ message: 'Invalid text or unsupported language' }); return;
